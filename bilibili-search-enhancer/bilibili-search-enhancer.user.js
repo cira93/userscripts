@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         B站精准搜索 · 自动补页
 // @namespace    local.bilibili.search.enhancer
-// @version      0.3.2
+// @version      0.3.3
 // @description  原生卡片、原站主题；严格匹配、自动补页，显示加载进度。Firefox 兼容。
 // @match        https://search.bilibili.com/*
 // @grant        GM_xmlhttpRequest
@@ -69,8 +69,8 @@
         return {bvid:v.bvid,title:clean(v.title),description:clean(v.description),tags:clean(tags),author:clean(v.author),mid:String(v.mid||''),danmaku:v.video_review,pic:String(v.pic||''),play:v.play,duration:v.duration,pubdate:v.pubdate};
     }
     function toNativeRecord(raw,example={}) {
-        // VideoList.info is a display model, not the unmodified search API model.
-        // Only supply known aliases used by this observed component schema. Never
+        // Some native schemas include display aliases alongside API fields.
+        // Only supply known aliases used by the observed component schema. Never
         // copy another video's identifiers, cover, author or pay/permission flags.
         const row={...raw};
         const put=(key,value)=>{
@@ -167,6 +167,7 @@
     const style=document.createElement('style');style.id='bse-style';
     style.textContent=`
     [data-bse-pager-hidden]{display:none!important}
+    [data-bse-expanded] > .to_hide_xs,[data-bse-expanded] > .to_hide_md,[data-bse-expanded] > .to_hide_xl{display:block!important}
     #bse-footer{padding:24px 8px;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;min-height:76px;font:13px/1.6 inherit;color:var(--text3,#9499a0)}
     #bse-footer .bse-message:empty{display:none}#bse-footer .bse-message[data-error]{color:var(--stress_red,#f25d8e)}
     #bse-footer button{font:inherit;padding:7px 14px;border:1px solid var(--line_regular,#e3e5e7);border-radius:6px;background:var(--bg1,#fff);color:var(--text2,#61666d);cursor:pointer}
@@ -218,8 +219,12 @@
                         const videos=Array.from(obj).filter(v=>v&&/^BV[a-zA-Z0-9]{10}$/.test(v.bvid||'')&&typeof v.title==='string');
                         const overlap=videos.filter(v=>ids.has(v.bvid)).length;
                         const rawShape=videos.filter(v=>'duration' in v&&('tag' in v||'description' in v||'play' in v)).length;
+                        // The live all-results list interleaves course/live/special
+                        // cards without BV IDs. Preserve them for rollback, but
+                        // don't reject the entire video source because of them.
+                        const supportedExtras=Array.from(obj).filter(v=>v&&!v.bvid&&['ketang','live_room','special_card'].includes(v.type)).length;
                         const reactive=safeGet(obj,'__v_isReactive')===true&&!safeGet(obj,'__v_isReadonly');
-                        if(overlap>=Math.min(2,ids.size)&&videos.length===obj.length&&rawShape===videos.length&&(reactive||set)) {
+                        if(overlap>=Math.min(2,ids.size)&&videos.length+supportedExtras===obj.length&&rawShape===videos.length&&(reactive||set)) {
                             arrays.add(obj);
                             const base={get,set,reactive,component,path,source:obj,
                                 label:String(component.type?.name||component.type?.__name||'anonymous').slice(0,80),
@@ -261,13 +266,22 @@
         const actual=adapter.get();
         if(fingerprint(actual)!==fingerprint(rows))throw new Error('原生列表拒绝更新，已保留原结果。');
         adapter.last=fingerprint(rows);adapter.lastArray=actual;
+        // The live site's Vue build can invalidate computed lists without
+        // scheduling their component render. Request Vue's own update after
+        // both writes and rollbacks; do not patch card DOM or call render().
+        const proxy=adapter.component?.proxy;
+        adapter.updateRequested=typeof proxy?.$forceUpdate==='function';
+        if(adapter.updateRequested)proxy.$forceUpdate();
     }
     function restoreAdapter(adapter) {
         if(!adapter)return;
         // Do not overwrite a newer search response supplied by Bilibili.
         try{if(adapter.get()===adapter.lastArray&&fingerprint(adapter.get())===adapter.last)writeAdapter(adapter,adapter.original);}catch{}
     }
-    function restorePagination() {document.querySelectorAll('[data-bse-pager-hidden]').forEach(e=>e.removeAttribute('data-bse-pager-hidden'));}
+    function restorePagination() {
+        document.querySelectorAll('[data-bse-pager-hidden]').forEach(e=>e.removeAttribute('data-bse-pager-hidden'));
+        document.querySelectorAll('[data-bse-expanded]').forEach(e=>e.removeAttribute('data-bse-expanded'));
+    }
     function current(s) {return state===s&&!disposed&&!bypass&&readConfig(location.href)?.key===s.config.key;}
     function setStatus(s,message,error=false) {
         if(!current(s))return;s.message.textContent=message;s.message.toggleAttribute('data-error',error);
@@ -291,6 +305,7 @@
     }
     function adapterDiagnostic(s,adapter,rows,rendered,result,waitMs) {
         s.diagnostics.push({component:adapter.label,path:adapter.path,mode:adapter.mode,
+            updateRequested:!!adapter.updateRequested,
             sourceFields:Object.keys(adapter.original?.[0]||{}).sort(),
             domCards:nativeList()?.querySelectorAll('.bili-video-card').length||0,
             missingFieldCounts:Object.fromEntries(['url','cover','uid','uname','desc','danmaku'].map(key=>[key,Array.from(adapter.get()||[]).filter(v=>!rendered.has(v.bvid)&&(v[key]===undefined||v[key]===null)).length])),expected:rows.length,rendered:rendered.size,missing:rows.filter(v=>!rendered.has(v.bvid)).length,
@@ -310,6 +325,9 @@
             if(s.adapter!==adapter||adapter.get()!==written||fingerprint(adapter.get())!==writtenFingerprint){schedule();return 'replaced';}
             const native=nativeList();rendered=native?visibleIDs(native):new Set();
             if(rendered.size===expected.size&&[...expected].every(id=>rendered.has(id))) {
+                // Native all-results CSS hides cards past its first-page quota.
+                // The managed list grows beyond that quota; keep its grid/card UI.
+                native.setAttribute('data-bse-expanded','');
                 adapterDiagnostic(s,adapter,rows,rendered,'ok',elapsed);return 'ok';
             }
         }
@@ -386,7 +404,7 @@
     function copyDiagnostic(s=state) {
         if(!s)return;
         // Structural details only: never include keyword, video metadata, cookies or URLs.
-        const report=JSON.stringify({version:'0.3.2',phase:s.scannedPages?'refill':'initial',scannedPages:s.scannedPages,
+        const report=JSON.stringify({version:'0.3.3',phase:s.scannedPages?'refill':'initial',scannedPages:s.scannedPages,
             attempts:s.diagnostics,sourceFields:Object.keys(s.adapter?.original?.[0]||{}).sort()},null,2);
         if(typeof GM_setClipboard==='function'){GM_setClipboard(report,'text');s.diagnostic.textContent='诊断已复制';}
         else {pageWindow.prompt('请复制以下适配诊断',report);}
