@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         B站精准搜索 · 自动补页
 // @namespace    local.bilibili.search.enhancer
-// @version      0.3.1
+// @version      0.3.2
 // @description  原生卡片、原站主题；严格匹配、自动补页，显示加载进度。Firefox 兼容。
 // @match        https://search.bilibili.com/*
 // @grant        GM_xmlhttpRequest
@@ -68,9 +68,36 @@
         const tags=Array.isArray(v.tag) ? v.tag.join(' ') : (v.tag || v.tags || '');
         return {bvid:v.bvid,title:clean(v.title),description:clean(v.description),tags:clean(tags),author:clean(v.author),mid:String(v.mid||''),danmaku:v.video_review,pic:String(v.pic||''),play:v.play,duration:v.duration,pubdate:v.pubdate};
     }
+    function toNativeRecord(raw,example={}) {
+        // VideoList.info is a display model, not the unmodified search API model.
+        // Only supply known aliases used by this observed component schema. Never
+        // copy another video's identifiers, cover, author or pay/permission flags.
+        const row={...raw};
+        const put=(key,value)=>{
+            if(Object.prototype.hasOwnProperty.call(example,key)&&(row[key]===undefined||row[key]===null||row[key]==='')&&value!==undefined&&value!==null) {
+                row[key]=typeof example[key]==='string'?String(value):typeof example[key]==='number'&&Number.isFinite(Number(value))?Number(value):value;
+            }
+        };
+        const bvid=/^BV[a-zA-Z0-9]{10}$/.test(raw.bvid||'')?raw.bvid:null;
+        put('url',bvid?'https://www.bilibili.com/video/'+bvid:raw.arcurl);
+        put('cover',raw.pic);
+        put('uid',raw.mid??raw.owner?.mid);
+        put('uname',raw.author??raw.owner?.name);
+        put('desc',raw.description);
+        put('danmaku',raw.video_review??raw.stat?.danmaku);
+        put('upic',raw.uface??raw.owner?.face);
+        put('uface',raw.upic??raw.owner?.face);
+        if(Object.prototype.hasOwnProperty.call(example,'tags')&&row.tags==null&&raw.tag!=null) {
+            row.tags=Array.isArray(example.tags)?(Array.isArray(raw.tag)?raw.tag:String(raw.tag).split(',').filter(Boolean)):raw.tag;
+        }
+        // Some native lists use the BV string as the card key; others use aid.
+        if(typeof example.id==='string'&&example.id===example.bvid&&bvid)row.id=bvid;
+        else put('id',raw.aid);
+        return row;
+    }
     // Expose only pure helpers to Node's isolated test VM; never defined by this userscript in a browser.
     if (typeof module !== 'undefined' && module.exports && typeof document === 'undefined') {
-        module.exports={md5,sign,normalize,terms,matches,readConfig}; return;
+        module.exports={md5,sign,normalize,terms,matches,readConfig,toNativeRecord}; return;
     }
 
 
@@ -226,7 +253,7 @@
         candidates.sort((a,b)=>b.score-a.score);return candidates.slice(0,6);
     }
     function writeAdapter(adapter,rows) {
-        const values=pageClone(rows),array=adapter.get();
+        const values=pageClone(rows.map(row=>toNativeRecord(row,adapter.original[0]))),array=adapter.get();
         if(!Array.isArray(array))throw new Error('原生列表的数据结构已变化。');
         if(adapter.mode==='replace'&&adapter.set)adapter.set(values);
         else if(adapter.reactive)array.splice(0,array.length,...values);
@@ -264,7 +291,9 @@
     }
     function adapterDiagnostic(s,adapter,rows,rendered,result,waitMs) {
         s.diagnostics.push({component:adapter.label,path:adapter.path,mode:adapter.mode,
-            sourceFields:Object.keys(adapter.original?.[0]||{}).sort(),expected:rows.length,rendered:rendered.size,missing:rows.filter(v=>!rendered.has(v.bvid)).length,
+            sourceFields:Object.keys(adapter.original?.[0]||{}).sort(),
+            domCards:nativeList()?.querySelectorAll('.bili-video-card').length||0,
+            missingFieldCounts:Object.fromEntries(['url','cover','uid','uname','desc','danmaku'].map(key=>[key,Array.from(adapter.get()||[]).filter(v=>!rendered.has(v.bvid)&&(v[key]===undefined||v[key]===null)).length])),expected:rows.length,rendered:rendered.size,missing:rows.filter(v=>!rendered.has(v.bvid)).length,
             unexpected:[...rendered].filter(id=>!rows.some(v=>v.bvid===id)).length,result,waitMs});
         if(s.diagnostics.length>12)s.diagnostics.shift();
     }
@@ -357,7 +386,7 @@
     function copyDiagnostic(s=state) {
         if(!s)return;
         // Structural details only: never include keyword, video metadata, cookies or URLs.
-        const report=JSON.stringify({version:'0.3.1',phase:s.scannedPages?'refill':'initial',scannedPages:s.scannedPages,
+        const report=JSON.stringify({version:'0.3.2',phase:s.scannedPages?'refill':'initial',scannedPages:s.scannedPages,
             attempts:s.diagnostics,sourceFields:Object.keys(s.adapter?.original?.[0]||{}).sort()},null,2);
         if(typeof GM_setClipboard==='function'){GM_setClipboard(report,'text');s.diagnostic.textContent='诊断已复制';}
         else {pageWindow.prompt('请复制以下适配诊断',report);}
