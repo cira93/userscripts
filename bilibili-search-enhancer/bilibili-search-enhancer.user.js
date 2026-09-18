@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         B站精准搜索 · 自动补页
 // @namespace    local.bilibili.search.enhancer
-// @version      0.3.0
+// @version      0.3.1
 // @description  原生卡片、原站主题；严格匹配、自动补页，显示加载进度。Firefox 兼容。
 // @match        https://search.bilibili.com/*
 // @grant        GM_xmlhttpRequest
@@ -9,6 +9,7 @@
 // @grant        GM_registerMenuCommand
 // @grant        GM_getValue
 // @grant        GM_setValue
+// @grant        GM_setClipboard
 // @connect      api.bilibili.com
 // @run-at       document-start
 // @license      MIT
@@ -150,7 +151,10 @@
         return document.querySelector('.video-list, .search-video-list')||document.querySelector('.bili-video-card')?.closest('.video-list-item, [class*="col_"]')?.parentElement||null;
     }
     function visibleIDs(native) {
-        return new Set([...native.querySelectorAll('a[href*="/video/BV"]')].map(a=>a.href.match(/BV[a-zA-Z0-9]{10}/)?.[0]).filter(Boolean));
+        // Ignore secondary links inside previews/popovers; inspect each real card's link.
+        const cards=[...native.querySelectorAll('.bili-video-card')].filter(c=>!c.parentElement?.closest('.bili-video-card'));
+        const links=cards.length?cards.map(c=>c.querySelector('a[href*="/video/BV"]')).filter(Boolean):[...native.querySelectorAll('a[href*="/video/BV"]')];
+        return new Set(links.map(a=>a.href.match(/BV[a-zA-Z0-9]{10}/)?.[0]).filter(Boolean));
     }
     function findComponents(native) {
         const components=[],seen=new Set();
@@ -175,51 +179,57 @@
         }
         return components;
     }
-    function findAdapter(native) {
-        const ids=visibleIDs(native);if(!ids.size)return null;
-        const candidates=[];
+    function findAdapters(native) {
+        const ids=visibleIDs(native);if(!ids.size)return [];
+        const candidates=[],arrays=new Set();
         for(const component of findComponents(native)) {
             const visited=new Set();let budget=450;
-            function walk(obj,depth,get,set) {
-                if(!obj||typeof obj!=='object'||depth>5||budget--<=0||visited.has(obj))return;visited.add(obj);
+            function walk(obj,depth,get,set,path,rootKind) {
+                if(!obj||typeof obj!=='object'||depth>6||budget--<=0||visited.has(obj))return;visited.add(obj);
                 if(Array.isArray(obj)) {
-                    if(obj.length>0&&obj.length<=2000) {
+                    if(obj.length>0&&obj.length<=2000&&!arrays.has(obj)) {
                         const videos=Array.from(obj).filter(v=>v&&/^BV[a-zA-Z0-9]{10}$/.test(v.bvid||'')&&typeof v.title==='string');
                         const overlap=videos.filter(v=>ids.has(v.bvid)).length;
-                        // Require the API-shaped list actually represented by this DOM.
-                        // Avoid video-card props, recommendation arrays, or transformed models.
                         const rawShape=videos.filter(v=>'duration' in v&&('tag' in v||'description' in v||'play' in v)).length;
                         const reactive=safeGet(obj,'__v_isReactive')===true&&!safeGet(obj,'__v_isReadonly');
                         if(overlap>=Math.min(2,ids.size)&&videos.length===obj.length&&rawShape===videos.length&&(reactive||set)) {
-                            candidates.push({get,set,reactive,component,score:overlap*100+(reactive?10:0),original:Array.from(obj)});
+                            arrays.add(obj);
+                            const base={get,set,reactive,component,path,source:obj,
+                                label:String(component.type?.name||component.type?.__name||'anonymous').slice(0,80),
+                                score:overlap*100+(reactive?10:0)+(rootKind==='props'?0:20),original:Array.from(obj)};
+                            if(reactive)candidates.push({...base,mode:'splice',score:base.score+1});
+                            if(set)candidates.push({...base,mode:'replace'});
                         }
                     }
-                    // Search response category blocks, but never recurse through videos.
-                    for(let i=0;i<Math.min(obj.length,12);i++){const v=obj[i];if(!v?.bvid)walk(v,depth+1,()=>obj[i],null);}
+                    for(let i=0;i<Math.min(obj.length,12);i++) {
+                        const v=obj[i];if(v?.bvid)continue;
+                        walk(v,depth+1,()=>get()?.[i],set?value=>{const copy=pageWindow.Array.from(get());copy[i]=value;set(copy);}:null,path+'['+i+']',rootKind);
+                    }
                     return;
                 }
                 if(obj.nodeType||obj instanceof Date||safeGet(obj,'__v_isVNode'))return;
                 if(safeGet(obj,'__v_isRef')) {
-                    walk(obj.value,depth+1,()=>obj.value,obj.__v_isReadonly?null:v=>{obj.value=v;});return;
+                    walk(obj.value,depth+1,()=>get()?.value,obj.__v_isReadonly?null:v=>{get().value=v;},path+'.value',rootKind);return;
                 }
                 let names;try{names=Object.keys(obj);}catch{return;}
                 for(const key of names.slice(0,100)) {
                     if(key.startsWith('$')||key.startsWith('_')||['parent','root','vnode','subTree','appContext'].includes(key))continue;
-                    const value=safeGet(obj,key);
-                    const writable=!safeGet(obj,'__v_isReadonly');
-                    walk(value,depth+1,()=>obj[key],writable?v=>{obj[key]=v;}:null);
+                    const value=safeGet(obj,key),writable=!safeGet(obj,'__v_isReadonly');
+                    // Rebuild the path up to the setup/data binding. This also notifies
+                    // shallowRef and reference-only watchers, unlike nested splice().
+                    const commit=!writable?null:set?v=>{const copy=pageWindow.Object.assign(new pageWindow.Object(),get());copy[key]=v;set(copy);}:v=>{get()[key]=v;};
+                    walk(value,depth+1,()=>get()?.[key],commit,path+'.'+key,rootKind);
                 }
             }
-            for(const root of [component.setupState,component.data,component.props])walk(root,0,()=>root,null);
+            for(const key of ['setupState','data','props'])walk(component[key],0,()=>component[key],null,key,key);
         }
-        candidates.sort((a,b)=>b.score-a.score);
-        return candidates[0]||null;
+        candidates.sort((a,b)=>b.score-a.score);return candidates.slice(0,6);
     }
     function writeAdapter(adapter,rows) {
         const values=pageClone(rows),array=adapter.get();
         if(!Array.isArray(array))throw new Error('原生列表的数据结构已变化。');
-        if(adapter.reactive)array.splice(0,array.length,...values);
-        else if(adapter.set)adapter.set(values);
+        if(adapter.mode==='replace'&&adapter.set)adapter.set(values);
+        else if(adapter.reactive)array.splice(0,array.length,...values);
         else throw new Error('原生列表无法更新。');
         const actual=adapter.get();
         if(fingerprint(actual)!==fingerprint(rows))throw new Error('原生列表拒绝更新，已保留原结果。');
@@ -245,31 +255,59 @@
         if(!current(s))return;
         s.more.disabled=s.busy||!s.adapter;s.more.hidden=s.done||!s.adapter;
         s.more.textContent=s.busy?'正在加载…':s.error?'重试':s.auto?'加载更多':'继续查找';
-        s.stop.hidden=!s.busy;s.original.hidden=!s.error;
+        s.stop.hidden=!s.busy;s.original.hidden=!s.error;s.diagnostic.hidden=!s.error;
     }
     function nativeFailure(s,error) {
         s.controller?.abort();s.auto=false;s.error=true;s.failed=true;
         restoreAdapter(s.adapter);s.adapter=null;restorePagination();
-        setStatus(s,`未能接入原生卡片，已保留原结果。${error?.message||'当前页面的列表结构暂不支持。'}`,true);buttons(s);
+        setStatus(s,`未能接入原生卡片，已保留原结果。${error?.message||'当前页面的列表结构暂不支持。'} 可复制诊断反馈。`,true);buttons(s);
+    }
+    function adapterDiagnostic(s,adapter,rows,rendered,result,waitMs) {
+        s.diagnostics.push({component:adapter.label,path:adapter.path,mode:adapter.mode,
+            sourceFields:Object.keys(adapter.original?.[0]||{}).sort(),expected:rows.length,rendered:rendered.size,missing:rows.filter(v=>!rendered.has(v.bvid)).length,
+            unexpected:[...rendered].filter(id=>!rows.some(v=>v.bvid===id)).length,result,waitMs});
+        if(s.diagnostics.length>12)s.diagnostics.shift();
+    }
+    async function verifyWrite(s,adapter) {
+        const rows=s.records.slice(),expected=new Set(rows.map(v=>v.bvid));
+        writeAdapter(adapter,rows);
+        const written=adapter.lastArray,writtenFingerprint=adapter.last;
+        const signal=s.controller?.signal||new AbortController().signal;
+        let elapsed=0,rendered=new Set();
+        // Wait for actual rendering, not an unconditional 80ms assumption.
+        for(const ms of [40,80,160,240,400,600]) {
+            await delay(ms,signal);elapsed+=ms;
+            if(!current(s))return 'cancelled';
+            if(s.adapter!==adapter||adapter.get()!==written||fingerprint(adapter.get())!==writtenFingerprint){schedule();return 'replaced';}
+            const native=nativeList();rendered=native?visibleIDs(native):new Set();
+            if(rendered.size===expected.size&&[...expected].every(id=>rendered.has(id))) {
+                adapterDiagnostic(s,adapter,rows,rendered,'ok',elapsed);return 'ok';
+            }
+        }
+        adapterDiagnostic(s,adapter,rows,rendered,'render-mismatch',elapsed);
+        throw new Error(`原生渲染未生效（应显示${rows.length}条，实际${rendered.size}条）。`);
     }
     async function renderNative(s) {
         if(!current(s)||!s.adapter)return;
+        s.rendering=true;
+        const tried=[];let failure;
         try {
-            const adapter=s.adapter;
-            writeAdapter(adapter,s.records);
-            const written=adapter.lastArray,writtenFingerprint=adapter.last;
-            // Let Vue render its own components; this script never builds video cards.
-            await delay(80,s.controller?.signal||new AbortController().signal);
-            if(!current(s))return;
-            // A native request can replace the list during this render tick. Rebind
-            // it instead of treating that ordinary race as an incompatible component.
-            if(s.adapter!==adapter||adapter.get()!==written||fingerprint(adapter.get())!==writtenFingerprint){schedule();return;}
-            const native=nativeList();
-            const rendered=native?visibleIDs(native):new Set();
-            const sample=[...s.records.slice(0,3),...s.records.slice(-3)];
-            const expected=new Set(s.records.map(v=>v.bvid));
-            if(sample.some(v=>!rendered.has(v.bvid))||[...rendered].some(id=>!expected.has(id)))throw new Error('列表数据已更新，但原生组件未渲染预期的视频。');
-        } catch(e) {if(e.name!=='AbortError'){nativeFailure(s,e);throw e;}}
+            // Finding the same videos in a cache does not prove that it drives the UI.
+            // Roll back unsuccessful candidates before trying another list binding.
+            for(let attempt=0;attempt<6&&current(s);attempt++) {
+                const adapter=s.adapter;tried.push(adapter);
+                try{return await verifyWrite(s,adapter);}catch(e) {
+                    if(e.name==='AbortError')throw e;
+                    failure=e;restoreAdapter(adapter);
+                    await delay(100,s.controller?.signal||new AbortController().signal);
+                    if(!current(s))return;
+                    const candidates=findAdapters(nativeList()||s.native);
+                    const next=candidates.find(a=>!tried.some(t=>t.mode===a.mode&&(t.source===a.source||(t.component===a.component&&t.path===a.path))));
+                    if(!next)break;s.adapter=next;
+                }
+            }
+            if(current(s)){nativeFailure(s,failure);throw failure||new Error('没有可用的原生列表。');}
+        } finally {s.rendering=false;}
     }
     async function fill(s) {
         if(!current(s)||s.busy||s.done||!s.adapter)return;
@@ -305,15 +343,24 @@
         if(!state)return;const s=state;state=null;s.controller?.abort();s.observer?.disconnect();s.footer.remove();restoreAdapter(s.adapter);restorePagination();
     }
     function createState(config,native) {
-        const s={config,native,required:terms(config.params.keyword),page:config.page,scannedPages:0,scanned:0,records:[],seen:new Set(),busy:false,done:false,error:false,auto:false,repeated:0,firstRound:true,created:Date.now()};
+        const s={config,native,required:terms(config.params.keyword),page:config.page,scannedPages:0,scanned:0,records:[],seen:new Set(),busy:false,done:false,error:false,auto:false,repeated:0,firstRound:true,created:Date.now(),diagnostics:[],rendering:false};
         s.footer=element('div');s.footer.id='bse-footer';
         s.message=element('span','bse-message','正在连接原生视频列表…');s.message.setAttribute('role','status');s.message.setAttribute('aria-live','polite');
         s.more=element('button','','继续查找');s.more.type='button';s.more.hidden=true;s.more.onclick=()=>fill(s);
         s.stop=element('button','','暂停');s.stop.type='button';s.stop.hidden=true;s.stop.onclick=()=>{s.auto=false;s.controller?.abort();};
         s.original=element('button','','查看原始结果');s.original.type='button';s.original.hidden=true;s.original.onclick=()=>{bypass=true;disposeState();};
-        s.footer.append(s.message,s.more,s.stop,s.original);
+        s.diagnostic=element('button','','复制诊断');s.diagnostic.type='button';s.diagnostic.hidden=true;s.diagnostic.onclick=()=>copyDiagnostic(s);
+        s.footer.append(s.message,s.more,s.stop,s.original,s.diagnostic);
         s.observer=new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting)&&s.auto)fill(s);},{rootMargin:'0px 0px 250px 0px'});s.observer.observe(s.footer);
         return s;
+    }
+    function copyDiagnostic(s=state) {
+        if(!s)return;
+        // Structural details only: never include keyword, video metadata, cookies or URLs.
+        const report=JSON.stringify({version:'0.3.1',phase:s.scannedPages?'refill':'initial',scannedPages:s.scannedPages,
+            attempts:s.diagnostics,sourceFields:Object.keys(s.adapter?.original?.[0]||{}).sort()},null,2);
+        if(typeof GM_setClipboard==='function'){GM_setClipboard(report,'text');s.diagnostic.textContent='诊断已复制';}
+        else {pageWindow.prompt('请复制以下适配诊断',report);}
     }
     function hidePagination(native) {
         const area=native.closest('.search-content, .search-page, .search-all-list')||native.parentElement;
@@ -336,16 +383,16 @@
         if(!state)state=createState(config,native);
         const s=state;s.native=native;
         if(s.footer.parentElement!==native.parentElement||native.nextElementSibling!==s.footer)native.after(s.footer);
-        if(s.failed)return;
+        if(s.failed||s.rendering)return;
         if(!s.adapter) {
-            const adapter=findAdapter(native);
+            const adapter=findAdapters(native)[0];
             if(adapter){attachAdapter(s,adapter);return;}
             if(Date.now()-s.created>8000)nativeFailure(s);
         } else {
             try {
                 if(s.adapter.get()!==s.adapter.lastArray||fingerprint(s.adapter.get())!==s.adapter.last) {
                     // Native sorting/hydration replaced the source: bind only a verified live list.
-                    const adapter=findAdapter(native);
+                    const adapter=findAdapters(native)[0];
                     if(adapter){s.adapter=adapter;renderNative(s).catch(()=>{});}
                 }
                 hidePagination(native);
@@ -366,6 +413,7 @@
     let scrollPending=false;
     addEventListener('scroll',()=>{if(scrollPending)return;scrollPending=true;requestAnimationFrame(()=>{scrollPending=false;const s=state;if(s?.auto&&s.footer.isConnected&&s.footer.getBoundingClientRect().top<innerHeight+250)fill(s);});},{passive:true});
     if(typeof GM_registerMenuCommand==='function') {
+        GM_registerMenuCommand('复制原生卡片适配诊断',()=>copyDiagnostic());
         GM_registerMenuCommand('切换匹配范围：标题 / 标题+简介+标签',()=>{scope=scope==='title'?'all':'title';if(typeof GM_setValue==='function')GM_setValue('scope',scope);disposeState();bypass=false;schedule();});
         GM_registerMenuCommand('恢复原始搜索 / 重新启用过滤',()=>{bypass=!bypass;disposeState();schedule();});
     }
