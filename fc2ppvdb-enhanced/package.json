@@ -1,0 +1,12 @@
+{
+  "name": "fc2ppvdb-enhanced-local",
+  "private": true,
+  "version": "2.1.10",
+  "scripts": {
+    "test": "node --check fc2ppvdb-enhanced.user.js && node tests/regression.cjs && node tests/availability.cjs && node tests/browser-transport.cjs && node tests/smoke.cjs && node tests/grid.cjs"
+  },
+  "devDependencies": {
+    "dexie": "4.4.2",
+    "playwright": "1.62.1"
+  }
+}

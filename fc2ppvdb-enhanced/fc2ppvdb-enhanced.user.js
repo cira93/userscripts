@@ -2,7 +2,7 @@
 // @name            FC2PPVDB Enhanced Edition
 // @name:en         FC2PPVDB Enhanced Edition
 // @namespace       https://greasyfork.org/zh-CN/scripts/581352-fc2ppvdb-enhanced-edition
-// @version         2.1.9
+// @version         2.1.10
 // @author          Icarusle
 // @description     FC2CMADB 增强脚本：磁力链接自动聚合、高清封面补全、图集预览、历史记录同步与过滤。
 // @description:en  Enhancement script for FC2CMADB: magnet aggregation, HD cover restoration, gallery preview, history sync and filtering.
@@ -64,7 +64,7 @@
 
   const SCRIPT_INFO = {
     NAME: "FC2PPVDB Enhanced",
-    VERSION: typeof GM_info !== "undefined" ? GM_info.script.version : "2.1.9",
+    VERSION: typeof GM_info !== "undefined" ? GM_info.script.version : "2.1.10",
     NAMESPACE: "https://greasyfork.org/zh-CN/scripts/552583-fc2ppvdb-enhanced",
     GREASYFORK_URL: "https://greasyfork.org/scripts/552583"
   };
@@ -7861,6 +7861,16 @@ static notify(text, title = "FC2PPVDB Enhanced", image, onClick) {
       return;
     }
     container.setAttribute(ENH_GRID_CONTAINER_ATTR, "1");
+    // Search results sit in an auto-sized flex item. Size containment on
+    // rebuilt cards removes its intrinsic width, collapsing a percentage grid.
+    // Mark only the section immediately wrapping an actual results grid.
+    if (location.hostname === 'fc2cmadb.com' && /^\/search(?:\/|$)/.test(location.pathname)) {
+      const section = container.parentElement;
+      if (section?.parentElement?.matches('.flex.flex-wrap') && section !== document.querySelector('main')) {
+        section.setAttribute('data-enh-grid-section', '1');
+      }
+    }
+
   };
   const SITE_GRID_MAP = [
     [
@@ -7973,7 +7983,14 @@ static notify(text, title = "FC2PPVDB Enhanced", image, onClick) {
             align-items: stretch !important;
         `;
     const cardCss = selectors.card ? `${cardRules} { padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; min-width: 0 !important; box-sizing: border-box !important; }` : "";
-    let siteSpecificCss = "";
+    let siteSpecificCss = hostname === 'fc2cmadb.com' && /^\/search(?:\/|$)/.test(pathname) ? `
+      [data-enh-grid-section] {
+        width: 100% !important;
+        min-width: 0 !important;
+        flex: 1 1 100% !important;
+        box-sizing: border-box !important;
+      }
+    ` : "";
     if (hostname.includes("javfc2.xyz")) {
       const C = Config.CLASSES;
       siteSpecificCss = `
@@ -8637,6 +8654,17 @@ static notify(text, title = "FC2PPVDB Enhanced", image, onClick) {
     portalProgressHover: "Waiting for hover",
     portalProgressDone: "Done",
     portalProgressToggle: "Minimize / expand",
+    portalProgressHelperStopped: "Helper tab timed out or closed; keep the list in front and check the helper",
+    portalProgressSiteBlocked: "Site verification or rate limit",
+    portalProgressHelperUnavailable: "Helper tab could not open",
+    portalProgressRequestTimeout: "Network request timed out",
+    portalProgressRequestFailed: "Network request failed",
+    portalProgressUnrecognized: "Unrecognized response",
+    portalProgressRetry: "Retry unconfirmed",
+    portalProgressVerification: "Site verification required: open the site normally",
+    portalProgressRateLimited: "HTTP 429: rate limited",
+    portalProgressAccessDenied: "Access denied (403 or page message)",
+    portalProgressSiteUnavailable: "HTTP 503: service unavailable",
     portalCheckHover: "Check on hover / keyboard focus",
     portalCheckOff: "Off (no checks)",
     portalResultFound: "Matching page found",
@@ -8900,6 +8928,17 @@ static notify(text, title = "FC2PPVDB Enhanced", image, onClick) {
     portalProgressHover: "ホバー待ち",
     portalProgressDone: "完了",
     portalProgressToggle: "最小化 / 展開",
+    portalProgressHelperStopped: "補助タブが停止。リストを前面に戻して補助タブを確認",
+    portalProgressSiteBlocked: "サイト認証または制限",
+    portalProgressHelperUnavailable: "補助タブを開けません",
+    portalProgressRequestTimeout: "通信タイムアウト",
+    portalProgressRequestFailed: "通信エラー",
+    portalProgressUnrecognized: "応答を判定できません",
+    portalProgressRetry: "未確認を再試行",
+    portalProgressVerification: "サイト認証が必要：通常のタブでサイトを開いてください",
+    portalProgressRateLimited: "HTTP 429：アクセス頻度制限",
+    portalProgressAccessDenied: "アクセス拒否（403 またはページ表示）",
+    portalProgressSiteUnavailable: "HTTP 503：サービス利用不可",
     portalCheckHover: "ホバー / キーボードフォーカス時のみ",
     portalCheckOff: "オフ（確認しない）",
     portalResultFound: "一致するページあり",
@@ -9163,6 +9202,17 @@ static notify(text, title = "FC2PPVDB Enhanced", image, onClick) {
     portalProgressHover: "等待悬停触发",
     portalProgressDone: "检查完成",
     portalProgressToggle: "收起 / 展开",
+    portalProgressHelperStopped: "辅助标签超时或已关闭，请保持列表前台并检查辅助标签",
+    portalProgressSiteBlocked: "网站验证或限流",
+    portalProgressHelperUnavailable: "无法打开辅助标签",
+    portalProgressRequestTimeout: "网络请求超时",
+    portalProgressRequestFailed: "网络请求失败",
+    portalProgressUnrecognized: "无法识别网站响应",
+    portalProgressRetry: "重试未确认",
+    portalProgressVerification: "需要网站验证，请正常打开该网站处理",
+    portalProgressRateLimited: "HTTP 429：请求过多",
+    portalProgressAccessDenied: "访问被拒绝（403 或页面提示）",
+    portalProgressSiteUnavailable: "HTTP 503：网站服务暂不可用",
     portalCheckHover: "仅悬停 / 键盘聚焦时检查",
     portalCheckOff: "关闭（不检查）",
     portalResultFound: "找到匹配页面",
@@ -14102,13 +14152,21 @@ variantClass,
     const escaped = String(id).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, 'i').test(text || '');
   };
+  const portalBlockReason = response => {
+    const status = Number(response.status);
+    if (status === 429) return 'rate-limited';
+    const doc = new DOMParser().parseFromString(String(response.responseText || response.response || ''), 'text/html');
+    if (/just a moment|attention required|verify (you are|that you are) human/i.test(doc.title) ||
+      doc.querySelector('#challenge-running, #challenge-form') || /cf-mitigated:\s*challenge/i.test(response.responseHeaders || '')) return 'site-verification';
+    if (status === 403 || /access denied/i.test(doc.title)) return 'access-denied';
+    if (status === 503) return 'site-unavailable';
+    return null;
+  };
   const classifyPortalResponse = (portal, id, response, requestedUrl) => {
     const status = Number(response.status);
     const html = String(response.responseText || response.response || '');
     const doc = new DOMParser().parseFromString(html, 'text/html');
-    const challenge = /just a moment|attention required|verify (you are|that you are) human|access denied/i.test(doc.title) ||
-      !!doc.querySelector('#challenge-running, #challenge-form') || /cf-mitigated:\s*challenge/i.test(response.responseHeaders || '');
-    if ([403, 429, 503].includes(status) || challenge) return 'blocked';
+    if (portalBlockReason(response)) return 'blocked';
     let finalUrl;
     try { finalUrl = new URL(response.finalUrl || requestedUrl); } catch { return 'unknown'; }
     const allowed = portal === 'supjav' ? ['supjav.com', 'www.supjav.com'] : ['missav.ws', 'missav.ai', 'www.missav.ws', 'www.missav.ai'];
@@ -14143,6 +14201,9 @@ variantClass,
   const portalWorkerSite = (hostname) => /^(www\.)?supjav\.com$/.test(hostname) ? 'supjav' : /^(www\.)?missav\.(ws|ai)$/.test(hostname) ? 'missav' : null;
   class PortalBrowserTransport {
     workers = new Map();
+    resume() {
+      for (const worker of this.workers.values()) worker.inspect?.();
+    }
     query(site, id, url) {
       if (typeof GM_openInTab !== 'function' || typeof GM_addValueChangeListener !== 'function') {
         return Promise.resolve({ result: 'unknown', reason: 'browser-unavailable' });
@@ -14163,11 +14224,12 @@ variantClass,
       return new Promise(resolve => {
         let listener;
         let timeout;
+        let poll;
         let done = false;
         const finish = response => {
           if (done) return;
           done = true;
-          clearTimeout(timeout);
+          clearTimeout(timeout); clearInterval(poll); worker.inspect = null;
           if (listener !== undefined) GM_removeValueChangeListener(listener);
           worker.finish = null;
           // Close only tabs created by this transport, never a manually opened tab.
@@ -14175,15 +14237,24 @@ variantClass,
           resolve(response);
         };
         worker.finish = finish;
-        listener = GM_addValueChangeListener(portalWorkerKey('reply', site), (_key, _old, reply) => {
-          if (reply?.token !== worker.token || reply.seq !== seq) return;
-          if (!['found', 'missing', 'unknown', 'blocked'].includes(reply.result)) return;
-          finish(reply);
-        });
-        timeout = setTimeout(() => {
-          finish({ result: 'unknown', reason: 'browser-timeout' });
-          this.close(site);
-        }, 25000);
+        const accept = reply => {
+          if (reply?.token !== worker.token || reply.seq !== seq) return false;
+          if (!['found', 'missing', 'unknown', 'blocked'].includes(reply.result)) return false;
+          finish(reply); return true;
+        };
+        // Storage notifications can be lost while mobile content tabs sleep.
+        // Read the saved reply before declaring a timeout, including on resume.
+        const inspect = () => {
+          if (done || accept(Storage.get(portalWorkerKey('reply', site), null))) return;
+          if (Date.now() >= job.expiresAt || worker.tab?.closed) {
+            finish({ result: 'unknown', reason: worker.tab?.closed ? 'browser-closed' : 'browser-timeout' });
+            this.close(site);
+          }
+        };
+        worker.inspect = inspect;
+        listener = GM_addValueChangeListener(portalWorkerKey('reply', site), (_key, _old, reply) => accept(reply));
+        poll = setInterval(inspect, 1000);
+        timeout = setTimeout(inspect, 25000);
         Storage.set(portalWorkerKey('job', site), job);
         if (!worker.tab) {
           // Some sites remove URL fragments before document-end. Keep the
@@ -14209,7 +14280,9 @@ variantClass,
       if (job?.token === worker.token) Storage.delete(portalWorkerKey('job', site));
       worker.tab?.close?.();
     }
-    closeAll() { [...this.workers.keys()].forEach(site => this.close(site)); }
+    closeAll() {
+      [...this.workers.keys()].forEach(site => this.close(site));
+    }
   }
   const startPortalBrowserWorker = () => {
     const site = portalWorkerSite(location.hostname);
@@ -14234,11 +14307,10 @@ variantClass,
         // The initial normal navigation already contains the first result.
         const currentId = site === 'supjav' ? new URL(location.href).searchParams.get('s') : location.pathname.match(/fc2-ppv-(\d+)/i)?.[1];
         let result = 'unknown';
-        if (currentId === job.id) {
-          result = classifyPortalResponse(site, job.id, { status: 200, responseText: document.documentElement.outerHTML, finalUrl: location.href }, job.url);
-        }
+        const initial = { status: 200, responseText: document.documentElement.outerHTML, finalUrl: location.href };
+        if (currentId === job.id) result = classifyPortalResponse(site, job.id, initial, job.url);
         if (result !== 'unknown') {
-          reply = { result };
+          reply = { result, reason: portalBlockReason(initial) };
         } else {
           // Reuse this site's ordinary first-party browser session. Never load
           // fetched HTML into the DOM or request its images / video resources.
@@ -14247,8 +14319,9 @@ variantClass,
           timeout = setTimeout(() => controller.abort(), 12000);
           const response = await fetch(target.href, { credentials: 'include', signal: controller.signal });
           const headers = `retry-after: ${response.headers.get('retry-after') || ''}\ncf-mitigated: ${response.headers.get('cf-mitigated') || ''}`;
-          result = classifyPortalResponse(site, job.id, { status: response.status, responseText: await response.text(), finalUrl: response.url, responseHeaders: headers }, target.href);
-          reply = { result, httpStatus: response.status, retryAfter: portalRetryAfter(headers, Date.now()) };
+          const received = { status: response.status, responseText: await response.text(), finalUrl: response.url, responseHeaders: headers };
+          result = classifyPortalResponse(site, job.id, received, target.href);
+          reply = { result, httpStatus: response.status, reason: portalBlockReason(received), retryAfter: portalRetryAfter(headers, Date.now()) };
         }
       } catch { reply = { result: 'unknown', reason: 'browser-request-failed' }; }
       finally { clearTimeout(timeout); controller = null; busy = false; }
@@ -14260,9 +14333,29 @@ variantClass,
       // A newer job may have arrived while an expired request was finishing.
       if (current?.seq !== job.seq) void run();
     };
-    const listener = GM_addValueChangeListener(portalWorkerKey('job', site), () => { void run(); });
-    const cleanup = () => { stopped = true; controller?.abort(); GM_removeValueChangeListener(listener); };
-    window.addEventListener('pagehide', cleanup, { once: true });
+    let listener, poll;
+    const attach = () => {
+      stopped = false;
+      listener = GM_addValueChangeListener(portalWorkerKey('job', site), () => { void run(); });
+      poll = setInterval(() => { void run(); }, 2000);
+    };
+    const resume = () => { if (!document.hidden) void run(); };
+    const restore = () => {
+      if (stopped) { lastSeq = null; attach(); }
+      void run();
+    };
+    const cleanup = event => {
+      stopped = true; controller?.abort(); clearInterval(poll); GM_removeValueChangeListener(listener);
+      if (!event.persisted) {
+        window.removeEventListener('pageshow', restore);
+        document.removeEventListener('visibilitychange', resume);
+        window.removeEventListener('pagehide', cleanup);
+      }
+    };
+    attach();
+    document.addEventListener('visibilitychange', resume);
+    window.addEventListener('pageshow', restore);
+    window.addEventListener('pagehide', cleanup);
     // Background helpers must not start media playback.
     document.querySelectorAll('video, audio').forEach(media => { media.autoplay = false; media.pause(); });
     void run();
@@ -14285,7 +14378,7 @@ variantClass,
     read(portal) {
       const value = Storage.get(this.key(portal), {});
       return value && typeof value === 'object' ? {
-        entries: value.entries || {}, pausedUntil: Number(value.pausedUntil) || 0
+        entries: value.entries || {}, pausedUntil: Number(value.pausedUntil) || 0, lastReason: value.lastReason || null
       } : { entries: {}, pausedUntil: 0 };
     }
     cached(state, key, now = Date.now()) {
@@ -14317,7 +14410,16 @@ variantClass,
       document.addEventListener('focusin', activate);
       this.cleanupFns.push(() => document.removeEventListener('mouseover', activate));
       this.cleanupFns.push(() => document.removeEventListener('focusin', activate));
-      const resume = () => { this.renderProgress(); if (!document.hidden) this.wake(); };
+      const resume = () => {
+        if (!document.hidden) {
+          // A pre-suspension timer may still exist but be delayed for minutes.
+          clearTimeout(this.timer); this.timer = null;
+          this.browserTransport.resume(); this.wake();
+        }
+        this.renderProgress();
+      };
+      window.addEventListener('pageshow', resume);
+      this.cleanupFns.push(() => window.removeEventListener('pageshow', resume));
       document.addEventListener('visibilitychange', resume);
       this.cleanupFns.push(() => document.removeEventListener('visibilitychange', resume));
       for (const portal of ['supjav', 'missav']) {
@@ -14397,16 +14499,18 @@ variantClass,
         section{box-sizing:border-box;width:330px;max-width:calc(100vw - 32px);padding:12px 14px;background:#222e;border:1px solid #666;border-radius:12px;color:#eee;box-shadow:0 4px 20px #0005}
         header{display:flex;align-items:center;gap:8px}strong{flex:1}button{color:inherit;background:none;border:0;font-size:18px;cursor:pointer;padding:0 4px}
         progress{width:100%;height:8px;accent-color:#65c98c;display:block;margin:8px 0}
-        p{margin:5px 0 0;overflow-wrap:anywhere}.muted{color:#ccc}
+        p{margin:5px 0 0;overflow-wrap:anywhere}.retry{font:inherit;border:1px solid #777;border-radius:6px;padding:5px 8px;margin-top:8px}.retry:disabled{opacity:.5;cursor:default}.muted{color:#ccc}
         [hidden]{display:none!important}
       </style><section><header><strong></strong><span data-count></span><button type="button" aria-expanded="true">−</button></header>
-        <progress max="1" value="0"></progress><div data-details><div data-sites></div><p class="muted" data-status role="status" aria-live="polite"></p></div></section>`;
+        <progress max="1" value="0"></progress><div data-details><div data-sites></div><p class="muted" data-status role="status" aria-live="polite"></p><button class="retry" data-retry type="button" hidden></button></div></section>`;
       const ui = {
         title: shadow.querySelector('strong'), count: shadow.querySelector('[data-count]'),
         bar: shadow.querySelector('progress'), sites: shadow.querySelector('[data-sites]'),
         status: shadow.querySelector('[data-status]'), details: shadow.querySelector('[data-details]'),
-        toggle: shadow.querySelector('button')
+        toggle: shadow.querySelector('button'), retry: shadow.querySelector('[data-retry]')
       };
+      ui.retry.textContent = t('portalProgressRetry');
+      ui.retry.addEventListener('click', () => this.retryUnconfirmed());
       ui.title.textContent = t('portalProgressTitle');
       ui.bar.setAttribute('aria-label', t('portalProgressChecked'));
       ui.toggle.title = t('portalProgressToggle');
@@ -14420,6 +14524,26 @@ variantClass,
       this.progressHost = host; this.progressUI = ui;
       this.renderProgress();
     }
+    retryUnconfirmed() {
+      const now = Date.now();
+      for (const site of ['supjav', 'missav']) {
+        const saved = this.read(site);
+        // Retry only this page's inconclusive work, after the server cooldown.
+        if (this.busy.has(site) || saved.pausedUntil > now) continue;
+        let changed = false;
+        for (const [button] of this.buttons) {
+          if (!button.isConnected || !this.enabled(button) || button.dataset.portalSite !== site) continue;
+          const key = button.dataset.portalKey;
+          if (!['unknown', 'blocked'].includes(this.resultFor(button, saved)?.status)) continue;
+          this.results.delete(`${site}:${key}`); delete saved.entries[key]; changed = true;
+        }
+        if (changed) {
+          saved.lastReason = null; Storage.set(this.key(site), saved);
+          this.browserTransport.close(site);
+        }
+      }
+      clearTimeout(this.timer); this.timer = null; this.wake(); this.renderProgress();
+    }
     renderProgress() {
       if (!this.progressUI) return;
       const { sites, total, done } = this.progressSnapshot();
@@ -14428,18 +14552,39 @@ variantClass,
       ui.count.textContent = `${done} / ${total}`;
       ui.bar.max = total || 1; ui.bar.value = done;
       const lines = [];
+      let uncertain = false, retryReady = false, cooling = false;
       for (const [site, row] of Object.entries(sites)) {
         const counts = ['found', 'missing', 'unknown', 'blocked']
           .filter(status => row[status]).map(status => `${t('portalProgress' + status[0].toUpperCase() + status.slice(1))} ${row[status]}`);
         let message = `${site === 'supjav' ? 'Supjav' : 'MissAV'} ${row.done}/${row.total}`;
         if (counts.length) message += ` · ${counts.join(' · ')}`;
-        if (row.done < row.total) {
-          const remaining = Math.ceil((this.read(site).pausedUntil - Date.now()) / 1000);
+        const remaining = Math.ceil((this.read(site).pausedUntil - Date.now()) / 1000);
+        if (row.unknown || row.blocked) {
+          uncertain = true;
+          if (remaining <= 0 && !this.busy.has(site)) retryReady = true;
+          if (remaining > 0) cooling = true;
+        }
+        if (row.done < row.total || ((row.unknown || row.blocked) && remaining > 0)) {
           if (remaining > 0) message += ` · ${t('portalProgressWaiting')} ${remaining}s`;
           else if (this.active.has(site)) message += ` · ${t('portalProgressChecking')} ${this.active.get(site).replace(/^fc2:/, '')}`;
         }
+        const reason = this.read(site).lastReason;
+        if (reason) {
+          const key = ['browser-timeout', 'browser-closed'].includes(reason) ? 'HelperStopped'
+            : reason === 'site-verification' ? 'Verification'
+            : reason === 'rate-limited' ? 'RateLimited'
+            : reason === 'access-denied' ? 'AccessDenied'
+            : reason === 'site-unavailable' ? 'SiteUnavailable'
+            : reason === 'site-blocked' ? 'SiteBlocked'
+            : reason === 'browser-unavailable' ? 'HelperUnavailable'
+            : reason === 'request-timeout' ? 'RequestTimeout'
+            : ['request-failed', 'browser-request-failed'].includes(reason) ? 'RequestFailed' : 'Unrecognized';
+          message += ` · ${t(`portalProgress${key}`)}`;
+        }
         lines.push(message);
       }
+      ui.retry.hidden = !uncertain; ui.retry.disabled = !retryReady;
+      if (cooling && !document.hidden) this.wake(1000);
       const siteText = lines.join('\n');
       if (ui.siteText !== siteText) {
         ui.siteText = siteText;
@@ -14508,6 +14653,7 @@ variantClass,
         if (response.aborted || generation !== this.generation) return;
         const result = response.result;
         const completed = Date.now();
+        saved.lastReason = ['found', 'missing'].includes(result) ? null : response.reason || (result === 'blocked' ? 'site-blocked' : 'unrecognized');
         if (result === 'blocked') saved.pausedUntil = completed + Math.max(PORTAL_CHECK_POLICY.blockedCooldown, response.retryAfter || 0);
         else if (result === 'unknown') saved.pausedUntil = completed + PORTAL_CHECK_POLICY.errorCooldown;
         const ttl = result === 'found' ? PORTAL_CHECK_POLICY.foundTtl : result === 'missing' ? PORTAL_CHECK_POLICY.missingTtl : PORTAL_CHECK_POLICY.unknownTtl;
@@ -14517,7 +14663,7 @@ variantClass,
         saved.entries = latest.entries;
         const current = this.cached(latest, key, completed);
         if (result === 'found' || current?.status !== 'found') {
-          saved.entries[key] = { status: result, expiresAt: completed + ttl };
+          saved.entries[key] = { status: result, expiresAt: completed + ttl, reason: saved.lastReason };
         }
         saved.entries = Object.fromEntries(Object.entries(saved.entries)
           .filter(([, entry]) => entry.expiresAt > completed).slice(-300));
