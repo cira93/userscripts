@@ -2,7 +2,7 @@
 // @name            FC2PPVDB Enhanced Edition
 // @name:en         FC2PPVDB Enhanced Edition
 // @namespace       https://greasyfork.org/zh-CN/scripts/581352-fc2ppvdb-enhanced-edition
-// @version         2.1.8
+// @version         2.1.9
 // @author          Icarusle
 // @description     FC2CMADB 增强脚本：磁力链接自动聚合、高清封面补全、图集预览、历史记录同步与过滤。
 // @description:en  Enhancement script for FC2CMADB: magnet aggregation, HD cover restoration, gallery preview, history sync and filtering.
@@ -64,7 +64,7 @@
 
   const SCRIPT_INFO = {
     NAME: "FC2PPVDB Enhanced",
-    VERSION: typeof GM_info !== "undefined" ? GM_info.script.version : "2.1.8",
+    VERSION: typeof GM_info !== "undefined" ? GM_info.script.version : "2.1.9",
     NAMESPACE: "https://greasyfork.org/zh-CN/scripts/552583-fc2ppvdb-enhanced",
     GREASYFORK_URL: "https://greasyfork.org/scripts/552583"
   };
@@ -1552,7 +1552,7 @@ static notify(text, title = "FC2PPVDB Enhanced", image, onClick) {
       showIdBadge: true,
       enableMagnets: true,
       enableExternalLinks: true,
-      portalCheckMode: "visible",
+      portalCheckMode: "page",
       enableActressName: true,
       language: normalizeLocalePreference(Storage.get(STORAGE_KEYS.LANGUAGE, "auto") || "auto"),
       lastSyncTs: UI_CONSTANTS.DEFAULT_TIMESTAMP,
@@ -1618,6 +1618,7 @@ static notify(text, title = "FC2PPVDB Enhanced", image, onClick) {
     const merged = { ...defaults, ...stored };
     merged.language = normalizeLocalePreference(String(merged.language || "auto"));
     merged.enabledPortals = normalizeEnabledPortals(merged.enabledPortals);
+    if (merged.portalCheckMode === "visible") merged.portalCheckMode = "page";
     return merged;
   };
   const createPersistState = (log) => {
@@ -8623,7 +8624,19 @@ static notify(text, title = "FC2PPVDB Enhanced", image, onClick) {
     optionEnableMagnets: "Aggregate Magnet Search (Sukebei/0cili)",
     optionEnableExternalLinks: "Show External Links",
     portalCheckLabel: "Availability highlighting",
-    portalCheckVisible: "Check visible cards",
+    portalCheckVisible: "Check all cards on this page",
+    portalProgressTitle: "External site checks",
+    portalProgressChecked: "Checked",
+    portalProgressFound: "Matches",
+    portalProgressMissing: "No match",
+    portalProgressUnknown: "Unconfirmed",
+    portalProgressBlocked: "Site restricted",
+    portalProgressChecking: "Checking",
+    portalProgressWaiting: "Waiting",
+    portalProgressHidden: "Page hidden: paused",
+    portalProgressHover: "Waiting for hover",
+    portalProgressDone: "Done",
+    portalProgressToggle: "Minimize / expand",
     portalCheckHover: "Check on hover / keyboard focus",
     portalCheckOff: "Off (no checks)",
     portalResultFound: "Matching page found",
@@ -8874,7 +8887,19 @@ static notify(text, title = "FC2PPVDB Enhanced", image, onClick) {
     optionEnableMagnets: "Sukebei/0cili マグネット検索を統合",
     optionEnableExternalLinks: "外部サイトへのジャンプを有効化",
     portalCheckLabel: "検索結果の強調表示",
-    portalCheckVisible: "表示中のカードを確認",
+    portalCheckVisible: "このページの全カードを確認",
+    portalProgressTitle: "外部サイトの確認",
+    portalProgressChecked: "確認済み",
+    portalProgressFound: "一致",
+    portalProgressMissing: "該当なし",
+    portalProgressUnknown: "未確認",
+    portalProgressBlocked: "サイト制限",
+    portalProgressChecking: "確認中",
+    portalProgressWaiting: "待機中",
+    portalProgressHidden: "非表示のため一時停止",
+    portalProgressHover: "ホバー待ち",
+    portalProgressDone: "完了",
+    portalProgressToggle: "最小化 / 展開",
     portalCheckHover: "ホバー / キーボードフォーカス時のみ",
     portalCheckOff: "オフ（確認しない）",
     portalResultFound: "一致するページあり",
@@ -9125,7 +9150,19 @@ static notify(text, title = "FC2PPVDB Enhanced", image, onClick) {
     optionEnableMagnets: "聚合 Sukebei/0cili 的磁力搜索",
     optionEnableExternalLinks: "开启外部站点跳转",
     portalCheckLabel: "外站结果高亮",
-    portalCheckVisible: "检查可见卡片",
+    portalCheckVisible: "检查本页全部卡片",
+    portalProgressTitle: "外站查询",
+    portalProgressChecked: "已检查",
+    portalProgressFound: "有结果",
+    portalProgressMissing: "无结果",
+    portalProgressUnknown: "未确认",
+    portalProgressBlocked: "站点限制",
+    portalProgressChecking: "正在检查",
+    portalProgressWaiting: "等待",
+    portalProgressHidden: "页面在后台，已暂停",
+    portalProgressHover: "等待悬停触发",
+    portalProgressDone: "检查完成",
+    portalProgressToggle: "收起 / 展开",
     portalCheckHover: "仅悬停 / 键盘聚焦时检查",
     portalCheckOff: "关闭（不检查）",
     portalResultFound: "找到匹配页面",
@@ -14238,7 +14275,10 @@ variantClass,
     inFlight = new Set();
     browserTransport = new PortalBrowserTransport();
     cleanupFns = [];
-    observer = null;
+    results = new Map();
+    active = new Map();
+    progressHost = null;
+    progressUI = null;
     timer = null;
     generation = 0;
     key(portal) { return `portal_availability_v4_${portal}`; }
@@ -14258,14 +14298,7 @@ variantClass,
     }
     onInit() {
       this.onCleanup();
-      this.observer = new IntersectionObserver(entries => {
-        for (const entry of entries) {
-          for (const [button, state] of this.buttons) {
-            if (state.target === entry.target) state.visibleSince = entry.isIntersecting ? Date.now() : 0;
-          }
-        }
-        this.wake();
-      }, { threshold: 0.01 });
+      this.createProgress();
       this.cleanupFns.push(CoreEvents.on(AppEvents.CARD_READY, ({ el }) => this.register(el)));
       for (const key of ['portalCheckMode', 'enableExternalLinks', 'enabledPortals']) {
         this.cleanupFns.push(State.on(key, () => {
@@ -14284,7 +14317,7 @@ variantClass,
       document.addEventListener('focusin', activate);
       this.cleanupFns.push(() => document.removeEventListener('mouseover', activate));
       this.cleanupFns.push(() => document.removeEventListener('focusin', activate));
-      const resume = () => { if (!document.hidden) this.wake(); };
+      const resume = () => { this.renderProgress(); if (!document.hidden) this.wake(); };
       document.addEventListener('visibilitychange', resume);
       this.cleanupFns.push(() => document.removeEventListener('visibilitychange', resume));
       for (const portal of ['supjav', 'missav']) {
@@ -14305,18 +14338,19 @@ variantClass,
       root.querySelectorAll('.btn-site-jump[data-portal-site]').forEach(button => {
         if (!['supjav', 'missav'].includes(button.dataset.portalSite) || this.buttons.has(button)) return;
         const target = button.closest('.processed-card') || button;
-        this.buttons.set(button, { target, visibleSince: 0, interestedUntil: 0 });
+        this.buttons.set(button, { target, interestedUntil: 0 });
         this.paint(button);
-        this.observer?.observe(target);
+
       });
+      this.wake();
     }
     paint(button, entry) {
       const site = button.dataset.portalSite;
-      if (entry === undefined) entry = this.cached(this.read(site), button.dataset.portalKey);
+      if (entry === undefined) entry = this.resultFor(button);
       const found = this.enabled(button) && entry?.status === 'found';
       button.classList.toggle('fc2-portal-found', found);
       const label = button.dataset.portalLabel;
-      const status = entry?.status || (this.enabled(button) ? 'queued' : 'off');
+      const status = !this.enabled(button) ? 'off' : entry?.status || (this.active.get(site) === button.dataset.portalKey ? 'checking' : 'queued');
       button.dataset.portalStatus = status;
       const title = `${label} · ${t(found ? 'portalResultFound' : `portalStatus_${status}`)}`;
       button.title = title;
@@ -14324,6 +14358,96 @@ variantClass,
       const tooltip = button.querySelector('.fc2-enh-tooltip');
       if (tooltip) tooltip.textContent = title;
       button.setAttribute('aria-label', title);
+    }
+    resultFor(button, saved = this.read(button.dataset.portalSite)) {
+      const key = button.dataset.portalKey;
+      const cached = this.cached(saved, key);
+      const completed = this.results.get(`${button.dataset.portalSite}:${key}`);
+      // A positive report from a normal tab can improve an unconfirmed attempt.
+      return cached?.status === 'found' ? cached : completed || cached;
+    }
+    progressSnapshot() {
+      const sites = {};
+      const seen = new Set();
+      const saved = new Map();
+      for (const [button] of this.buttons) {
+        if (!button.isConnected || !this.enabled(button)) continue;
+        const site = button.dataset.portalSite;
+        const task = `${site}:${button.dataset.portalKey}`;
+        if (seen.has(task)) continue;
+        seen.add(task);
+        const row = sites[site] ||= { total: 0, done: 0, found: 0, missing: 0, unknown: 0, blocked: 0 };
+        row.total++;
+        if (!saved.has(site)) saved.set(site, this.read(site));
+        const status = this.resultFor(button, saved.get(site))?.status;
+        if (['found', 'missing', 'unknown', 'blocked'].includes(status)) { row.done++; row[status]++; }
+      }
+      const total = Object.values(sites).reduce((n, row) => n + row.total, 0);
+      const done = Object.values(sites).reduce((n, row) => n + row.done, 0);
+      return { sites, total, done };
+    }
+    createProgress() {
+      const host = document.createElement('div');
+      host.id = 'fc2-portal-progress';
+      // Isolate layout and styles from both the website and the card toolbar.
+      host.style.cssText = 'position:fixed;left:16px;bottom:16px;z-index:2147483000;max-width:calc(100vw - 32px)';
+      const shadow = host.attachShadow({ mode: 'open' });
+      shadow.innerHTML = `<style>
+        :host{color-scheme:dark;font:12px/1.5 system-ui,sans-serif}
+        section{box-sizing:border-box;width:330px;max-width:calc(100vw - 32px);padding:12px 14px;background:#222e;border:1px solid #666;border-radius:12px;color:#eee;box-shadow:0 4px 20px #0005}
+        header{display:flex;align-items:center;gap:8px}strong{flex:1}button{color:inherit;background:none;border:0;font-size:18px;cursor:pointer;padding:0 4px}
+        progress{width:100%;height:8px;accent-color:#65c98c;display:block;margin:8px 0}
+        p{margin:5px 0 0;overflow-wrap:anywhere}.muted{color:#ccc}
+        [hidden]{display:none!important}
+      </style><section><header><strong></strong><span data-count></span><button type="button" aria-expanded="true">−</button></header>
+        <progress max="1" value="0"></progress><div data-details><div data-sites></div><p class="muted" data-status role="status" aria-live="polite"></p></div></section>`;
+      const ui = {
+        title: shadow.querySelector('strong'), count: shadow.querySelector('[data-count]'),
+        bar: shadow.querySelector('progress'), sites: shadow.querySelector('[data-sites]'),
+        status: shadow.querySelector('[data-status]'), details: shadow.querySelector('[data-details]'),
+        toggle: shadow.querySelector('button')
+      };
+      ui.title.textContent = t('portalProgressTitle');
+      ui.bar.setAttribute('aria-label', t('portalProgressChecked'));
+      ui.toggle.title = t('portalProgressToggle');
+      ui.toggle.setAttribute('aria-label', t('portalProgressToggle'));
+      ui.toggle.addEventListener('click', () => {
+        ui.details.hidden = !ui.details.hidden;
+        ui.toggle.textContent = ui.details.hidden ? '+' : '−';
+        ui.toggle.setAttribute('aria-expanded', String(!ui.details.hidden));
+      });
+      document.body.append(host);
+      this.progressHost = host; this.progressUI = ui;
+      this.renderProgress();
+    }
+    renderProgress() {
+      if (!this.progressUI) return;
+      const { sites, total, done } = this.progressSnapshot();
+      this.progressHost.hidden = !total;
+      const ui = this.progressUI;
+      ui.count.textContent = `${done} / ${total}`;
+      ui.bar.max = total || 1; ui.bar.value = done;
+      const lines = [];
+      for (const [site, row] of Object.entries(sites)) {
+        const counts = ['found', 'missing', 'unknown', 'blocked']
+          .filter(status => row[status]).map(status => `${t('portalProgress' + status[0].toUpperCase() + status.slice(1))} ${row[status]}`);
+        let message = `${site === 'supjav' ? 'Supjav' : 'MissAV'} ${row.done}/${row.total}`;
+        if (counts.length) message += ` · ${counts.join(' · ')}`;
+        if (row.done < row.total) {
+          const remaining = Math.ceil((this.read(site).pausedUntil - Date.now()) / 1000);
+          if (remaining > 0) message += ` · ${t('portalProgressWaiting')} ${remaining}s`;
+          else if (this.active.has(site)) message += ` · ${t('portalProgressChecking')} ${this.active.get(site).replace(/^fc2:/, '')}`;
+        }
+        lines.push(message);
+      }
+      const siteText = lines.join('\n');
+      if (ui.siteText !== siteText) {
+        ui.siteText = siteText;
+        ui.sites.replaceChildren(...lines.map(text => { const p = document.createElement('p'); p.textContent = text; return p; }));
+      }
+      const status = done === total ? 'Done' : document.hidden ? 'Hidden' : State.proxy.portalCheckMode === 'hover' ? 'Hover' : 'Checking';
+      const text = t(`portalProgress${status}`);
+      if (ui.status.textContent !== text) ui.status.textContent = text;
     }
     wake(delay = 0) {
       if (this.timer) return;
@@ -14336,34 +14460,29 @@ variantClass,
       const states = new Map();
       for (const [button, state] of this.buttons) {
         if (!button.isConnected) {
-          this.observer?.unobserve(state.target || button); this.buttons.delete(button); continue;
+          this.buttons.delete(button); continue;
         }
         if (!this.enabled(button)) continue;
-        const visible = state.visibleSince && now - state.visibleSince >= PORTAL_CHECK_POLICY.dwell;
-        const wanted = state.interestedUntil > now || (State.proxy.portalCheckMode === 'visible' && visible);
-        if (!wanted) {
-          if (State.proxy.portalCheckMode === 'visible' && state.visibleSince) waiting = true;
-          continue;
-        }
-        if (!button.getClientRects().length) continue;
+        const wanted = state.interestedUntil > now || ['page', 'visible'].includes(State.proxy.portalCheckMode);
+        if (!wanted) continue;
         const portal = button.dataset.portalSite;
         if (!states.has(portal)) states.set(portal, this.read(portal));
         const saved = states.get(portal);
-        const entry = this.cached(saved, button.dataset.portalKey, now);
+        const entry = this.resultFor(button, saved);
         this.paint(button, entry);
-        if (entry) {
-          if (entry.status === 'blocked' || entry.status === 'unknown') waiting = true;
-          continue;
-        }
+        if (entry) continue;
         waiting = true;
         if (this.busy.has(portal) || saved.pausedUntil > now) continue;
         this.busy.add(portal);
+        this.active.set(portal, button.dataset.portalKey);
         const generation = this.generation;
         void this.check(button).catch(error => Logger.warn('PortalCheck', 'Check failed', error)).finally(() => {
-          this.busy.delete(portal);
-          if (generation === this.generation) this.wake();
+          if (generation === this.generation) {
+            this.busy.delete(portal); this.active.delete(portal); this.wake();
+          }
         });
       }
+      this.renderProgress();
       if (waiting) this.wake(300);
     }
     async check(button) {
@@ -14380,12 +14499,13 @@ variantClass,
         const key = button.dataset.portalKey;
         const now = Date.now();
         const saved = this.read(portal);
-        const existing = this.cached(saved, key, now);
+        const existing = this.resultFor(button, saved);
         if (existing) { this.paint(button, existing); return; }
         if (saved.pausedUntil > now) return;
         this.paint(button, { status: 'checking' });
+        const generation = this.generation;
         const response = await this.browserTransport.query(portal, button.dataset.portalId, button.dataset.portalUrl);
-        if (response.aborted) return;
+        if (response.aborted || generation !== this.generation) return;
         const result = response.result;
         const completed = Date.now();
         if (result === 'blocked') saved.pausedUntil = completed + Math.max(PORTAL_CHECK_POLICY.blockedCooldown, response.retryAfter || 0);
@@ -14402,6 +14522,7 @@ variantClass,
         saved.entries = Object.fromEntries(Object.entries(saved.entries)
           .filter(([, entry]) => entry.expiresAt > completed).slice(-300));
         Storage.set(this.key(portal), saved);
+        this.results.set(`${portal}:${key}`, saved.entries[key]);
         this.buttons.forEach((_state, target) => {
           if (target.dataset.portalSite === portal && target.dataset.portalKey === key) this.paint(target, saved.entries[key]);
         });
@@ -14418,7 +14539,8 @@ variantClass,
     onCleanup() {
       ++this.generation;
       clearTimeout(this.timer); this.timer = null;
-      this.observer?.disconnect(); this.observer = null;
+      this.progressHost?.remove(); this.progressHost = null; this.progressUI = null;
+      this.results.clear(); this.active.clear();
       this.cleanupFns.splice(0).forEach(fn => fn());
       this.browserTransport.closeAll();
       this.buttons.clear(); this.busy.clear();
@@ -20212,7 +20334,7 @@ ${previewText}`)) {
           children: Select({
             id: "portalCheckMode", controller: ctrl, binding: "portalCheckMode",
             options: [
-              { value: "visible", label: t("portalCheckVisible") },
+              { value: "page", label: t("portalCheckVisible") },
               { value: "hover", label: t("portalCheckHover") },
               { value: "off", label: t("portalCheckOff") }
             ]
