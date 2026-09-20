@@ -2,7 +2,7 @@
 // @name            FC2PPVDB Enhanced Edition
 // @name:en         FC2PPVDB Enhanced Edition
 // @namespace       https://greasyfork.org/zh-CN/scripts/581352-fc2ppvdb-enhanced-edition
-// @version         2.1.5
+// @version         2.1.6
 // @author          Icarusle
 // @description     FC2CMADB 增强脚本：磁力链接自动聚合、高清封面补全、图集预览、历史记录同步与过滤。
 // @description:en  Enhancement script for FC2CMADB: magnet aggregation, HD cover restoration, gallery preview, history sync and filtering.
@@ -10,6 +10,12 @@
 // @icon            https://fc2ppvdb.com/favicon.ico
 // @match           https://fc2cmadb.com/*
 // @require         https://unpkg.com/dexie@4.4.2/dist/dexie.js
+// @connect         supjav.com
+// @connect         www.supjav.com
+// @connect         missav.ws
+// @connect         missav.ai
+// @connect         www.missav.ws
+// @connect         www.missav.ai
 // @connect         sukebei.nyaa.si
 // @connect         paipancon.com
 // @connect         fourhoi.com
@@ -52,7 +58,7 @@
 
   const SCRIPT_INFO = {
     NAME: "FC2PPVDB Enhanced",
-    VERSION: typeof GM_info !== "undefined" ? GM_info.script.version : "2.1.5",
+    VERSION: typeof GM_info !== "undefined" ? GM_info.script.version : "2.1.6",
     NAMESPACE: "https://greasyfork.org/zh-CN/scripts/552583-fc2ppvdb-enhanced",
     GREASYFORK_URL: "https://greasyfork.org/scripts/552583"
   };
@@ -1540,6 +1546,7 @@ static notify(text, title = "FC2PPVDB Enhanced", image, onClick) {
       showIdBadge: true,
       enableMagnets: true,
       enableExternalLinks: true,
+      portalCheckMode: "visible",
       enableActressName: true,
       language: normalizeLocalePreference(Storage.get(STORAGE_KEYS.LANGUAGE, "auto") || "auto"),
       lastSyncTs: UI_CONSTANTS.DEFAULT_TIMESTAMP,
@@ -3428,6 +3435,16 @@ static notify(text, title = "FC2PPVDB Enhanced", image, onClick) {
     .${C.cardRebuilt}.has-active-dropdown {
         z-index:var(--fc2-z-dropdown)!important;
     }
+
+    .resource-links-container .resource-btn.fc2-portal-found,
+    .resource-links-container .resource-btn.fc2-portal-found:hover {
+        color:var(--fc2-success)!important;
+        background:rgba(var(--fc2-success-rgb),.12)!important;
+        box-shadow:inset 0 -2px 0 var(--fc2-success);
+    }
+    body.fc2-hide-external .btn-site-jump,
+    body.fc2-hide-supjav .btn-site-supjav,
+    body.fc2-hide-missav .btn-site-missav { display:none!important; }
 
     /* Global Visibility Toggles */
     body.hide-viewed-btn .btn-toggle-view { display:none!important; }
@@ -8599,6 +8616,12 @@ static notify(text, title = "FC2PPVDB Enhanced", image, onClick) {
     optionShowIdBadge: "Show ID Badge on Card",
     optionEnableMagnets: "Aggregate Magnet Search (Sukebei/0cili)",
     optionEnableExternalLinks: "Show External Links",
+    portalCheckLabel: "Availability highlighting",
+    portalCheckVisible: "Check visible cards (low frequency)",
+    portalCheckHover: "Check on hover / keyboard focus",
+    portalCheckOff: "Off (no checks)",
+    portalResultFound: "Matching page found",
+    portalCheckHint: "Cached results appear immediately. New checks are gradual: per site 1 request / 10 seconds, 30 / hour, 120 / day. Rate limits or challenges pause checks. Highlighting does not verify playback.",
     optionEnableActressName: "Fetch Actress Name from FD2PPV (Player Page)",
     optionReplaceFc2Covers: "Auto-replace HD Covers (Fourhoi)",
     optionSupjavSortByViews: "Sort Supjav List by Views",
@@ -8838,6 +8861,12 @@ static notify(text, title = "FC2PPVDB Enhanced", image, onClick) {
     optionShowIdBadge: "品番コピーボタンを表示",
     optionEnableMagnets: "Sukebei/0cili マグネット検索を統合",
     optionEnableExternalLinks: "外部サイトへのジャンプを有効化",
+    portalCheckLabel: "検索結果の強調表示",
+    portalCheckVisible: "表示中のカードを低頻度で確認",
+    portalCheckHover: "ホバー / キーボードフォーカス時のみ",
+    portalCheckOff: "オフ（確認しない）",
+    portalResultFound: "一致するページあり",
+    portalCheckHint: "キャッシュは即時表示。各サイト10秒に1回、毎時30回、毎日120回まで。制限や認証画面で一時停止します。再生可否は確認しません。",
     optionEnableActressName: "FD2PPV から出演者名を取得 (Player)",
     optionReplaceFc2Covers: "Fourhoi 高画質カバーを自動適用",
     optionSupjavSortByViews: "Supjav リストを再生数順にソート",
@@ -9077,6 +9106,12 @@ static notify(text, title = "FC2PPVDB Enhanced", image, onClick) {
     optionShowIdBadge: "卡片显示番号复制按钮",
     optionEnableMagnets: "聚合 Sukebei/0cili 的磁力搜索",
     optionEnableExternalLinks: "开启外部站点跳转",
+    portalCheckLabel: "外站结果高亮",
+    portalCheckVisible: "可见卡片低频检查",
+    portalCheckHover: "仅悬停 / 键盘聚焦时检查",
+    portalCheckOff: "关闭（不检查）",
+    portalResultFound: "找到匹配页面",
+    portalCheckHint: "缓存立即显示，新结果逐步检查：每站每10秒最多1次，每小时30次、每天120次；限流或验证码时暂停。高亮表示找到匹配页面，不代表视频一定可播放。",
     optionEnableActressName: "播放器页抓取 FD2PPV 的演员名",
     optionReplaceFc2Covers: "自动补全 Fourhoi 的高清封面",
     optionSupjavSortByViews: "Supjav 列表按播放量排序",
@@ -13997,6 +14032,242 @@ variantClass,
     const portal = getPortalById(portalId);
     return portal ? buildPortalUrl(portal, data.id, data.type) : "";
   };
+  const PORTAL_CHECK_POLICY = Object.freeze({
+    interval: 10000, timeout: 8000, dwell: 800,
+    hourly: 30, daily: 120,
+    foundTtl: 7 * 86400000, missingTtl: 6 * 3600000, unknownTtl: 3600000,
+    blockedCooldown: 6 * 3600000, errorCooldown: 15 * 60000
+  });
+  const portalCheckMatchesId = (text, id) => {
+    const escaped = String(id).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, 'i').test(text || '');
+  };
+  const classifyPortalResponse = (portal, id, response, requestedUrl) => {
+    const status = Number(response.status);
+    const html = String(response.responseText || '');
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const challenge = /just a moment|attention required|verify (you are|that you are) human|access denied/i.test(doc.title) ||
+      !!doc.querySelector('#challenge-running, #challenge-form, .cf-turnstile, iframe[src*="challenges.cloudflare.com"], #captcha');
+    if ([403, 429, 503].includes(status) || challenge) return 'blocked';
+    let finalUrl;
+    try { finalUrl = new URL(response.finalUrl || requestedUrl); } catch { return 'unknown'; }
+    const allowed = portal === 'supjav' ? ['supjav.com', 'www.supjav.com'] : ['missav.ws', 'missav.ai', 'www.missav.ws', 'www.missav.ai'];
+    if (!allowed.includes(finalUrl.hostname)) return 'unknown';
+    if (portal === 'missav' && [404, 410].includes(status)) return 'missing';
+    if (status !== 200 || !html) return 'unknown';
+    if (portal === 'supjav') {
+      const links = [...doc.querySelectorAll('.posts .post h3 a, .posts .entry-title a, article .entry-title a')];
+      const found = links.some(link => {
+        let url;
+        try { url = new URL(link.getAttribute('href'), finalUrl); } catch { return false; }
+        return allowed.includes(url.hostname) && url.pathname !== '/' &&
+          portalCheckMatchesId(link.textContent + ' ' + (link.getAttribute('title') || ''), id);
+      });
+      if (found) return 'found';
+      if (doc.querySelector('.posts, .no-results, .search-no-results')) return 'missing';
+      return 'unknown';
+    }
+    // A successful HTTP response or a matching recommendation is insufficient.
+    // Require the requested detail URL, its primary heading, and a player.
+    const requestedPath = new URL(requestedUrl).pathname.replace(/\/$/, '');
+    if (finalUrl.pathname.replace(/\/$/, '') !== requestedPath) return 'unknown';
+    const heading = doc.querySelector('h1');
+    const player = doc.querySelector('video, #player, .player-container, [x-data*="player"], .plyr');
+    return heading && player && portalCheckMatchesId(heading.textContent, id) ? 'found' : 'unknown';
+  };
+  const portalRetryAfter = (headers, now) => {
+    const value = String(headers || '').match(/^retry-after:\s*(.+)$/im)?.[1]?.trim();
+    if (!value) return 0;
+    return /^\d+$/.test(value) ? Number(value) * 1000 : Math.max(0, Date.parse(value) - now) || 0;
+  };
+  class PortalAvailabilityService {
+    buttons = new Map();
+    busy = new Set();
+    activeRequests = new Set();
+    cleanupFns = [];
+    observer = null;
+    timer = null;
+    generation = 0;
+    key(portal) { return `portal_availability_v1_${portal}`; }
+    read(portal) {
+      const value = Storage.get(this.key(portal), {});
+      return value && typeof value === 'object' ? {
+        entries: value.entries || {}, requests: Array.isArray(value.requests) ? value.requests : [],
+        nextAt: Number(value.nextAt) || 0, pausedUntil: Number(value.pausedUntil) || 0
+      } : { entries: {}, requests: [], nextAt: 0, pausedUntil: 0 };
+    }
+    cached(state, key, now = Date.now()) {
+      const entry = state.entries[key];
+      return entry && entry.expiresAt > now ? entry : null;
+    }
+    enabled(button) {
+      return State.proxy.portalCheckMode !== 'off' && State.proxy.enableExternalLinks &&
+        (State.proxy.enabledPortals || []).includes(button.dataset.portalSite);
+    }
+    onInit() {
+      this.onCleanup();
+      this.observer = new IntersectionObserver(entries => {
+        for (const entry of entries) {
+          const state = this.buttons.get(entry.target);
+          if (state) state.visibleSince = entry.isIntersecting ? Date.now() : 0;
+        }
+        this.wake();
+      }, { threshold: 0.01 });
+      this.cleanupFns.push(CoreEvents.on(AppEvents.CARD_READY, ({ el }) => this.register(el)));
+      for (const key of ['portalCheckMode', 'enableExternalLinks', 'enabledPortals']) {
+        this.cleanupFns.push(State.on(key, () => {
+          // Cancelling is safe: requests already reserved their rate-limit slot.
+          for (const request of this.activeRequests) request.abort();
+          this.buttons.forEach((_state, button) => this.paint(button));
+          this.wake();
+        }));
+      }
+      const activate = event => {
+        const button = event.target.closest?.('[data-portal-site]');
+        const state = this.buttons.get(button);
+        if (state) { state.interestedUntil = Date.now() + 15000; this.wake(); }
+      };
+      document.addEventListener('mouseover', activate);
+      document.addEventListener('focusin', activate);
+      this.cleanupFns.push(() => document.removeEventListener('mouseover', activate));
+      this.cleanupFns.push(() => document.removeEventListener('focusin', activate));
+      const resume = () => { if (!document.hidden) this.wake(); };
+      document.addEventListener('visibilitychange', resume);
+      this.cleanupFns.push(() => document.removeEventListener('visibilitychange', resume));
+      this.register(document);
+    }
+    register(root) {
+      root.querySelectorAll('.btn-site-jump[data-portal-site]').forEach(button => {
+        if (!['supjav', 'missav'].includes(button.dataset.portalSite) || this.buttons.has(button)) return;
+        this.buttons.set(button, { visibleSince: 0, interestedUntil: 0 });
+        this.paint(button);
+        this.observer?.observe(button);
+      });
+    }
+    paint(button, entry) {
+      const site = button.dataset.portalSite;
+      if (entry === undefined) entry = this.cached(this.read(site), button.dataset.portalKey);
+      const found = this.enabled(button) && entry?.status === 'found';
+      button.classList.toggle('fc2-portal-found', found);
+      const label = button.dataset.portalLabel;
+      const title = found ? `${label} · ${t('portalResultFound')}` : label;
+      button.title = title;
+      button.dataset.title = title;
+      const tooltip = button.querySelector('.fc2-enh-tooltip');
+      if (tooltip) tooltip.textContent = title;
+      button.setAttribute('aria-label', title);
+    }
+    wake() {
+      if (this.timer) return;
+      this.timer = setTimeout(() => { this.timer = null; this.tick(); }, 1000);
+    }
+    tick() {
+      if (document.hidden) return;
+      let waiting = false;
+      const now = Date.now();
+      const states = new Map();
+      for (const [button, state] of this.buttons) {
+        if (!button.isConnected) {
+          this.observer?.unobserve(button); this.buttons.delete(button); continue;
+        }
+        if (!this.enabled(button)) continue;
+        const visible = state.visibleSince && now - state.visibleSince >= PORTAL_CHECK_POLICY.dwell;
+        const wanted = state.interestedUntil > now || (State.proxy.portalCheckMode === 'visible' && visible);
+        if (!wanted) {
+          if (State.proxy.portalCheckMode === 'visible' && state.visibleSince) waiting = true;
+          continue;
+        }
+        if (!button.getClientRects().length) continue;
+        const portal = button.dataset.portalSite;
+        if (!states.has(portal)) states.set(portal, this.read(portal));
+        const saved = states.get(portal);
+        const entry = this.cached(saved, button.dataset.portalKey, now);
+        this.paint(button, entry);
+        if (entry) continue;
+        waiting = true;
+        if (this.busy.has(portal) || saved.nextAt > now || saved.pausedUntil > now ||
+          saved.requests.filter(time => time > now - 3600000).length >= PORTAL_CHECK_POLICY.hourly ||
+          saved.requests.filter(time => time > now - 86400000).length >= PORTAL_CHECK_POLICY.daily) continue;
+        this.busy.add(portal);
+        const generation = this.generation;
+        void this.check(button).catch(error => Logger.warn('PortalCheck', 'Check failed', error)).finally(() => {
+          this.busy.delete(portal);
+          if (generation === this.generation) this.wake();
+        });
+      }
+      if (waiting) this.wake();
+    }
+    async check(button) {
+      // Web Locks serialize tabs of this matched origin. Without support,
+      // stay cache-only instead of using a racy storage-based lock.
+      if (!navigator.locks?.request) return;
+      return navigator.locks.request(`fc2-portal-check-${button.dataset.portalSite}`, { ifAvailable: true }, async lock => {
+        if (!lock || !button.isConnected || !this.enabled(button) || document.hidden) return;
+        const portal = button.dataset.portalSite;
+        if (!['supjav', 'missav'].includes(portal)) return;
+        const requested = new URL(button.dataset.portalUrl);
+        const allowedHost = portal === 'supjav' ? 'supjav.com' : 'missav.ws';
+        if (requested.protocol !== 'https:' || requested.hostname !== allowedHost) return;
+        const key = button.dataset.portalKey;
+        const now = Date.now();
+        const saved = this.read(portal);
+        const existing = this.cached(saved, key, now);
+        if (existing) { this.paint(button, existing); return; }
+        saved.requests = saved.requests.filter(time => time > now - 86400000);
+        if (saved.pausedUntil > now || saved.nextAt > now ||
+          saved.requests.length >= PORTAL_CHECK_POLICY.daily ||
+          saved.requests.filter(time => time > now - 3600000).length >= PORTAL_CHECK_POLICY.hourly) return;
+        saved.requests.push(now);
+        saved.nextAt = now + PORTAL_CHECK_POLICY.interval;
+        // Persist before issuing a request; closing a tab must not reset budgets.
+        Storage.set(this.key(portal), saved);
+        const response = await this.request(button.dataset.portalUrl);
+        if (response.aborted) return;
+        const result = classifyPortalResponse(portal, button.dataset.portalId, response, button.dataset.portalUrl);
+        const completed = Date.now();
+        if (result === 'blocked') saved.pausedUntil = completed + Math.max(PORTAL_CHECK_POLICY.blockedCooldown, portalRetryAfter(response.responseHeaders, completed));
+        else if (!response.status || response.status >= 500) saved.pausedUntil = completed + PORTAL_CHECK_POLICY.errorCooldown;
+        const ttl = result === 'found' ? PORTAL_CHECK_POLICY.foundTtl : result === 'missing' ? PORTAL_CHECK_POLICY.missingTtl : PORTAL_CHECK_POLICY.unknownTtl;
+        saved.entries[key] = { status: result, expiresAt: completed + ttl };
+        saved.entries = Object.fromEntries(Object.entries(saved.entries)
+          .filter(([, entry]) => entry.expiresAt > completed).slice(-300));
+        Storage.set(this.key(portal), saved);
+        this.buttons.forEach((_state, target) => {
+          if (target.dataset.portalSite === portal && target.dataset.portalKey === key) this.paint(target, saved.entries[key]);
+        });
+      });
+    }
+    request(url) {
+      return new Promise(resolve => {
+        let handle;
+        let finished = false;
+        const finish = response => {
+          if (finished) return;
+          finished = true; clearTimeout(watchdog); this.activeRequests.delete(request);
+          resolve(response);
+        };
+        const request = { abort: () => { handle?.abort(); finish({ status: 0, aborted: true }); } };
+        const watchdog = setTimeout(() => { finish({ status: 0 }); handle?.abort(); }, PORTAL_CHECK_POLICY.timeout + 1000);
+        this.activeRequests.add(request);
+        try {
+          handle = GM_xmlhttpRequest({ method: 'GET', url, anonymous: true,
+            timeout: PORTAL_CHECK_POLICY.timeout, responseType: 'text',
+            onload: finish, onerror: () => finish({ status: 0 }),
+            ontimeout: () => finish({ status: 0 }), onabort: () => finish({ status: 0, aborted: true }) });
+        } catch { finish({ status: 0 }); }
+      });
+    }
+    onCleanup() {
+      ++this.generation;
+      clearTimeout(this.timer); this.timer = null;
+      this.observer?.disconnect(); this.observer = null;
+      this.cleanupFns.splice(0).forEach(fn => fn());
+      this.activeRequests.forEach(request => request.abort());
+      this.buttons.clear(); this.busy.clear();
+    }
+  }
+  AppContainer.register('portal-availability', new PortalAvailabilityService());
+
   const createSiteJumpButton = (portalId, data) => {
     const portal = getPortalById(portalId);
     if (!portal) return null;
@@ -14004,7 +14275,7 @@ variantClass,
     const className = `btn-site-jump btn-site-${portalId}`;
     const url = resolveDirectPortalUrl(portalId, data);
     if (!url) return null;
-    return Button$1(
+    const button = Button$1(
       PORTAL_ICONS[portalId] || IconPlayCircle,
       label,
       void 0,
@@ -14016,6 +14287,11 @@ variantClass,
       className,
       { iconOnly: true, size: "micro", ariaLabel: label, title: label }
     );
+    Object.assign(button.dataset, {
+      portalSite: portalId, portalKey: `${data.type}:${data.id}`,
+      portalId: data.id, portalUrl: url, portalLabel: label
+    });
+    return button;
   };
   const createSiteJumpButtons = (data) => ["supjav", "missav"].map((portalId) => createSiteJumpButton(portalId, data)).filter(Boolean);
   const createGalleryButton = (data) => {
@@ -15588,6 +15864,8 @@ createElement: (tag) => document.createElement(tag)
       GlobalClick.destroy();
     }
     bindStateListeners() {
+      this.cleanupFns.push(State.on("enableExternalLinks", () => this.updateGlobalClasses()));
+      this.cleanupFns.push(State.on("enabledPortals", () => this.updateGlobalClasses()));
       this.cleanupFns.push(State.on("showViewedBtn", () => this.updateGlobalClasses()));
       this.cleanupFns.push(State.on("showIdBadge", () => this.updateGlobalClasses()));
       this.cleanupFns.push(State.on("cardDensity", () => this.updateGlobalClasses()));
@@ -15648,6 +15926,10 @@ createElement: (tag) => document.createElement(tag)
       );
     }
     updateGlobalClasses() {
+      document.body.classList.toggle("fc2-hide-external", !State.proxy.enableExternalLinks);
+      for (const portal of ["supjav", "missav"]) {
+        document.body.classList.toggle(`fc2-hide-${portal}`, !(State.proxy.enabledPortals || []).includes(portal));
+      }
       const isShowViewed = State.proxy.showViewedBtn !== false;
       const isShowId = State.proxy.showIdBadge !== false;
       document.body.classList.toggle("hide-viewed-btn", !isShowViewed);
@@ -17139,6 +17421,7 @@ maintenanceTimer = null;
     "showIdBadge",
     "enableMagnets",
     "enableExternalLinks",
+    "portalCheckMode",
     "enableActressName",
     "language",
     "syncMode",
@@ -19741,6 +20024,18 @@ ${previewText}`)) {
           controller: ctrl,
           binding: "enableExternalLinks"
         }),
+        FormRow({
+          label: t("portalCheckLabel"),
+          children: Select({
+            id: "portalCheckMode", controller: ctrl, binding: "portalCheckMode",
+            options: [
+              { value: "visible", label: t("portalCheckVisible") },
+              { value: "hover", label: t("portalCheckHover") },
+              { value: "off", label: t("portalCheckOff") }
+            ]
+          })
+        }),
+        h("div", { className: "fc2-enh-hint" }, t("portalCheckHint")),
         CheckboxRow({
           id: "replaceFc2Covers",
           label: t("optionReplaceFc2Covers"),
