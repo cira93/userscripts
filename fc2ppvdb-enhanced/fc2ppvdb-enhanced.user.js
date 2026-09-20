@@ -2,7 +2,7 @@
 // @name            FC2PPVDB Enhanced Edition
 // @name:en         FC2PPVDB Enhanced Edition
 // @namespace       https://greasyfork.org/zh-CN/scripts/581352-fc2ppvdb-enhanced-edition
-// @version         2.1.7
+// @version         2.1.8
 // @author          Icarusle
 // @description     FC2CMADB 增强脚本：磁力链接自动聚合、高清封面补全、图集预览、历史记录同步与过滤。
 // @description:en  Enhancement script for FC2CMADB: magnet aggregation, HD cover restoration, gallery preview, history sync and filtering.
@@ -64,7 +64,7 @@
 
   const SCRIPT_INFO = {
     NAME: "FC2PPVDB Enhanced",
-    VERSION: typeof GM_info !== "undefined" ? GM_info.script.version : "2.1.7",
+    VERSION: typeof GM_info !== "undefined" ? GM_info.script.version : "2.1.8",
     NAMESPACE: "https://greasyfork.org/zh-CN/scripts/552583-fc2ppvdb-enhanced",
     GREASYFORK_URL: "https://greasyfork.org/scripts/552583"
   };
@@ -8633,7 +8633,7 @@ static notify(text, title = "FC2PPVDB Enhanced", image, onClick) {
     portalStatus_unknown: "Could not confirm (request failed or page changed)",
     portalStatus_blocked: "Site verification / rate limit; open the site to verify",
     portalStatus_off: "Checks off",
-    portalCheckHint: "Cached results appear immediately. One request per site at a time; no hourly/daily quota or fixed delay. Verification or rate limits are shown in the tooltip. Opening a matching site page reports the result back.",
+    portalCheckHint: "One background helper tab per site performs automatic first-party checks without taking focus and closes when idle. No hourly/daily quota. Verification or rate limits pause checks.",
     optionEnableActressName: "Fetch Actress Name from FD2PPV (Player Page)",
     optionReplaceFc2Covers: "Auto-replace HD Covers (Fourhoi)",
     optionSupjavSortByViews: "Sort Supjav List by Views",
@@ -8884,7 +8884,7 @@ static notify(text, title = "FC2PPVDB Enhanced", image, onClick) {
     portalStatus_unknown: "確認できません（通信またはページ形式）",
     portalStatus_blocked: "サイト認証 / 制限：サイトを開いて確認",
     portalStatus_off: "確認オフ",
-    portalCheckHint: "各サイト同時1件。時間・日ごとの回数制限と固定待機なし。認証や制限はツールチップに表示。サイトを開いて確認した結果を共有します。",
+    portalCheckHint: "各サイト1つのバックグラウンドタブで自動確認。フォーカスを移さず、待機時は閉じます。時間・日ごとの制限なし。認証や制限時は停止します。",
     optionEnableActressName: "FD2PPV から出演者名を取得 (Player)",
     optionReplaceFc2Covers: "Fourhoi 高画質カバーを自動適用",
     optionSupjavSortByViews: "Supjav リストを再生数順にソート",
@@ -9135,7 +9135,7 @@ static notify(text, title = "FC2PPVDB Enhanced", image, onClick) {
     portalStatus_unknown: "未能确认（请求失败或页面结构变化）",
     portalStatus_blocked: "站点验证 / 限流，请打开网站确认",
     portalStatus_off: "已关闭检查",
-    portalCheckHint: "每站最多1个并发请求，无小时 / 每日配额或固定请求间隔。验证或限流会显示在悬停提示中；正常打开外站确认结果后会回传高亮。",
+    portalCheckHint: "自动为每站复用1个后台辅助标签执行站内查询，不抢焦点，空闲后关闭；无小时 / 每日配额。验证码或限流会停止检查并提示。",
     optionEnableActressName: "播放器页抓取 FD2PPV 的演员名",
     optionReplaceFc2Covers: "自动补全 Fourhoi 的高清封面",
     optionSupjavSortByViews: "Supjav 列表按播放量排序",
@@ -14102,16 +14102,146 @@ variantClass,
     if (!value) return 0;
     return /^\d+$/.test(value) ? Number(value) * 1000 : Math.max(0, Date.parse(value) - now) || 0;
   };
+  const portalWorkerKey = (kind, site) => `portal_browser_${kind}_v1_${site}`;
+  const portalWorkerSite = (hostname) => /^(www\.)?supjav\.com$/.test(hostname) ? 'supjav' : /^(www\.)?missav\.(ws|ai)$/.test(hostname) ? 'missav' : null;
+  class PortalBrowserTransport {
+    workers = new Map();
+    query(site, id, url) {
+      if (typeof GM_openInTab !== 'function' || typeof GM_addValueChangeListener !== 'function') {
+        return Promise.resolve({ result: 'unknown', reason: 'browser-unavailable' });
+      }
+      let target;
+      try { target = new URL(url); } catch { return Promise.resolve({ result: 'unknown' }); }
+      if (target.protocol !== 'https:' || portalWorkerSite(target.hostname) !== site) return Promise.resolve({ result: 'unknown' });
+      let worker = this.workers.get(site);
+      if (worker?.tab?.closed) { clearTimeout(worker.idle); this.workers.delete(site); worker = null; }
+      if (worker?.finish) return Promise.resolve({ result: 'unknown', reason: 'busy' });
+      if (!worker) {
+        worker = { token: crypto.randomUUID(), tab: null, idle: null, finish: null };
+        this.workers.set(site, worker);
+      }
+      clearTimeout(worker.idle);
+      const seq = crypto.randomUUID();
+      const job = { token: worker.token, seq, site, id: String(id), url: target.href, expiresAt: Date.now() + 25000 };
+      return new Promise(resolve => {
+        let listener;
+        let timeout;
+        let done = false;
+        const finish = response => {
+          if (done) return;
+          done = true;
+          clearTimeout(timeout);
+          if (listener !== undefined) GM_removeValueChangeListener(listener);
+          worker.finish = null;
+          // Close only tabs created by this transport, never a manually opened tab.
+          worker.idle = setTimeout(() => this.close(site), 30000);
+          resolve(response);
+        };
+        worker.finish = finish;
+        listener = GM_addValueChangeListener(portalWorkerKey('reply', site), (_key, _old, reply) => {
+          if (reply?.token !== worker.token || reply.seq !== seq) return;
+          if (!['found', 'missing', 'unknown', 'blocked'].includes(reply.result)) return;
+          finish(reply);
+        });
+        timeout = setTimeout(() => {
+          finish({ result: 'unknown', reason: 'browser-timeout' });
+          this.close(site);
+        }, 25000);
+        Storage.set(portalWorkerKey('job', site), job);
+        if (!worker.tab) {
+          // Some sites remove URL fragments before document-end. Keep the
+          // helper identity in a query parameter as well.
+          target.searchParams.set('fc2-enh-worker', worker.token);
+          target.hash = `fc2-enh-worker=${worker.token}`;
+          try {
+            worker.tab = GM_openInTab(target.href, { active: false, insert: true, setParent: true });
+            if (!worker.tab) { finish({ result: 'unknown', reason: 'browser-unavailable' }); this.close(site); }
+          } catch {
+            finish({ result: 'unknown', reason: 'browser-unavailable' }); this.close(site);
+          }
+        }
+      });
+    }
+    close(site) {
+      const worker = this.workers.get(site);
+      if (!worker) return;
+      this.workers.delete(site);
+      worker.finish?.({ aborted: true });
+      clearTimeout(worker.idle);
+      const job = Storage.get(portalWorkerKey('job', site), null);
+      if (job?.token === worker.token) Storage.delete(portalWorkerKey('job', site));
+      worker.tab?.close?.();
+    }
+    closeAll() { [...this.workers.keys()].forEach(site => this.close(site)); }
+  }
+  const startPortalBrowserWorker = () => {
+    const site = portalWorkerSite(location.hostname);
+    const token = new URL(location.href).searchParams.get('fc2-enh-worker') || new URLSearchParams(location.hash.slice(1)).get('fc2-enh-worker');
+    const first = site && Storage.get(portalWorkerKey('job', site), null);
+    if (!site || !token || first?.token !== token || first.expiresAt <= Date.now()) return false;
+    let busy = false;
+    let lastSeq = null;
+    let controller;
+    let stopped = false;
+    const run = async () => {
+      const job = Storage.get(portalWorkerKey('job', site), null);
+      if (stopped || busy || !job || job.token !== token || job.seq === lastSeq || job.expiresAt <= Date.now()) return;
+      let target;
+      try { target = new URL(job.url); } catch { return; }
+      if (target.protocol !== 'https:' || portalWorkerSite(target.hostname) !== site || !/^\d{5,8}$/.test(job.id)) return;
+      busy = true;
+      lastSeq = job.seq;
+      let timeout;
+      let reply;
+      try {
+        // The initial normal navigation already contains the first result.
+        const currentId = site === 'supjav' ? new URL(location.href).searchParams.get('s') : location.pathname.match(/fc2-ppv-(\d+)/i)?.[1];
+        let result = 'unknown';
+        if (currentId === job.id) {
+          result = classifyPortalResponse(site, job.id, { status: 200, responseText: document.documentElement.outerHTML, finalUrl: location.href }, job.url);
+        }
+        if (result !== 'unknown') {
+          reply = { result };
+        } else {
+          // Reuse this site's ordinary first-party browser session. Never load
+          // fetched HTML into the DOM or request its images / video resources.
+          target.host = location.host;
+          controller = new AbortController();
+          timeout = setTimeout(() => controller.abort(), 12000);
+          const response = await fetch(target.href, { credentials: 'include', signal: controller.signal });
+          const headers = `retry-after: ${response.headers.get('retry-after') || ''}\ncf-mitigated: ${response.headers.get('cf-mitigated') || ''}`;
+          result = classifyPortalResponse(site, job.id, { status: response.status, responseText: await response.text(), finalUrl: response.url, responseHeaders: headers }, target.href);
+          reply = { result, httpStatus: response.status, retryAfter: portalRetryAfter(headers, Date.now()) };
+        }
+      } catch { reply = { result: 'unknown', reason: 'browser-request-failed' }; }
+      finally { clearTimeout(timeout); controller = null; busy = false; }
+      if (stopped) return;
+      const current = Storage.get(portalWorkerKey('job', site), null);
+      if (current?.token === token && current.seq === job.seq) {
+        Storage.set(portalWorkerKey('reply', site), { token, seq: job.seq, ...reply });
+      }
+      // A newer job may have arrived while an expired request was finishing.
+      if (current?.seq !== job.seq) void run();
+    };
+    const listener = GM_addValueChangeListener(portalWorkerKey('job', site), () => { void run(); });
+    const cleanup = () => { stopped = true; controller?.abort(); GM_removeValueChangeListener(listener); };
+    window.addEventListener('pagehide', cleanup, { once: true });
+    // Background helpers must not start media playback.
+    document.querySelectorAll('video, audio').forEach(media => { media.autoplay = false; media.pause(); });
+    void run();
+    return true;
+  };
+
   class PortalAvailabilityService {
     buttons = new Map();
     busy = new Set();
     inFlight = new Set();
-    activeRequests = new Set();
+    browserTransport = new PortalBrowserTransport();
     cleanupFns = [];
     observer = null;
     timer = null;
     generation = 0;
-    key(portal) { return `portal_availability_v2_${portal}`; }
+    key(portal) { return `portal_availability_v4_${portal}`; }
     read(portal) {
       const value = Storage.get(this.key(portal), {});
       return value && typeof value === 'object' ? {
@@ -14140,7 +14270,7 @@ variantClass,
       for (const key of ['portalCheckMode', 'enableExternalLinks', 'enabledPortals']) {
         this.cleanupFns.push(State.on(key, () => {
           // Stop outstanding checks when their display settings change.
-          for (const request of this.activeRequests) request.abort();
+          this.browserTransport.closeAll();
           this.buttons.forEach((_state, button) => this.paint(button));
           this.wake();
         }));
@@ -14166,6 +14296,9 @@ variantClass,
           this.cleanupFns.push(() => GM_removeValueChangeListener(listener));
         }
       }
+      const closeWorkers = () => this.browserTransport.closeAll();
+      window.addEventListener('pagehide', closeWorkers);
+      this.cleanupFns.push(() => window.removeEventListener('pagehide', closeWorkers));
       this.register(document);
     }
     register(root) {
@@ -14218,7 +14351,10 @@ variantClass,
         const saved = states.get(portal);
         const entry = this.cached(saved, button.dataset.portalKey, now);
         this.paint(button, entry);
-        if (entry) continue;
+        if (entry) {
+          if (entry.status === 'blocked' || entry.status === 'unknown') waiting = true;
+          continue;
+        }
         waiting = true;
         if (this.busy.has(portal) || saved.pausedUntil > now) continue;
         this.busy.add(portal);
@@ -14248,12 +14384,12 @@ variantClass,
         if (existing) { this.paint(button, existing); return; }
         if (saved.pausedUntil > now) return;
         this.paint(button, { status: 'checking' });
-        const response = await this.request(button.dataset.portalUrl);
+        const response = await this.browserTransport.query(portal, button.dataset.portalId, button.dataset.portalUrl);
         if (response.aborted) return;
-        const result = classifyPortalResponse(portal, button.dataset.portalId, response, button.dataset.portalUrl);
+        const result = response.result;
         const completed = Date.now();
-        if (result === 'blocked') saved.pausedUntil = completed + Math.max(PORTAL_CHECK_POLICY.blockedCooldown, portalRetryAfter(response.responseHeaders, completed));
-        else if (!response.status || response.status >= 500) saved.pausedUntil = completed + PORTAL_CHECK_POLICY.errorCooldown;
+        if (result === 'blocked') saved.pausedUntil = completed + Math.max(PORTAL_CHECK_POLICY.blockedCooldown, response.retryAfter || 0);
+        else if (result === 'unknown') saved.pausedUntil = completed + PORTAL_CHECK_POLICY.errorCooldown;
         const ttl = result === 'found' ? PORTAL_CHECK_POLICY.foundTtl : result === 'missing' ? PORTAL_CHECK_POLICY.missingTtl : PORTAL_CHECK_POLICY.unknownTtl;
         // A real browser tab may have reported a positive result while this
         // request was running. Merge instead of overwriting that evidence.
@@ -14279,32 +14415,12 @@ variantClass,
         return await run();
       } finally { this.inFlight.delete(site); }
     }
-    request(url) {
-      return new Promise(resolve => {
-        let handle;
-        let finished = false;
-        const finish = response => {
-          if (finished) return;
-          finished = true; clearTimeout(watchdog); this.activeRequests.delete(request);
-          resolve(response);
-        };
-        const request = { abort: () => { handle?.abort(); finish({ status: 0, aborted: true }); } };
-        const watchdog = setTimeout(() => { finish({ status: 0 }); handle?.abort(); }, PORTAL_CHECK_POLICY.timeout + 1000);
-        this.activeRequests.add(request);
-        try {
-          handle = GM_xmlhttpRequest({ method: 'GET', url,
-            timeout: PORTAL_CHECK_POLICY.timeout, responseType: 'text',
-            onload: finish, onerror: () => finish({ status: 0 }),
-            ontimeout: () => finish({ status: 0 }), onabort: () => finish({ status: 0, aborted: true }) });
-        } catch { finish({ status: 0 }); }
-      });
-    }
     onCleanup() {
       ++this.generation;
       clearTimeout(this.timer); this.timer = null;
       this.observer?.disconnect(); this.observer = null;
       this.cleanupFns.splice(0).forEach(fn => fn());
-      this.activeRequests.forEach(request => request.abort());
+      this.browserTransport.closeAll();
       this.buttons.clear(); this.busy.clear();
     }
   }
@@ -18812,7 +18928,7 @@ maintenanceTimer = null;
   };
   const main = async () => {
     if (/^(www\.)?(supjav\.com|missav\.(ws|ai))$/.test(location.hostname)) {
-      observeNativePortalResult();
+      if (!startPortalBrowserWorker()) observeNativePortalResult();
       return;
     }
     Logger.init();
