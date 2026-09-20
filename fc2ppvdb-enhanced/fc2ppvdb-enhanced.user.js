@@ -2,13 +2,19 @@
 // @name            FC2PPVDB Enhanced Edition
 // @name:en         FC2PPVDB Enhanced Edition
 // @namespace       https://greasyfork.org/zh-CN/scripts/581352-fc2ppvdb-enhanced-edition
-// @version         2.1.6
+// @version         2.1.7
 // @author          Icarusle
 // @description     FC2CMADB 增强脚本：磁力链接自动聚合、高清封面补全、图集预览、历史记录同步与过滤。
 // @description:en  Enhancement script for FC2CMADB: magnet aggregation, HD cover restoration, gallery preview, history sync and filtering.
 // @license         MIT
 // @icon            https://fc2ppvdb.com/favicon.ico
 // @match           https://fc2cmadb.com/*
+// @match           https://supjav.com/*
+// @match           https://www.supjav.com/*
+// @match           https://missav.ws/*
+// @match           https://missav.ai/*
+// @match           https://www.missav.ws/*
+// @match           https://www.missav.ai/*
 // @require         https://unpkg.com/dexie@4.4.2/dist/dexie.js
 // @connect         supjav.com
 // @connect         www.supjav.com
@@ -58,7 +64,7 @@
 
   const SCRIPT_INFO = {
     NAME: "FC2PPVDB Enhanced",
-    VERSION: typeof GM_info !== "undefined" ? GM_info.script.version : "2.1.6",
+    VERSION: typeof GM_info !== "undefined" ? GM_info.script.version : "2.1.7",
     NAMESPACE: "https://greasyfork.org/zh-CN/scripts/552583-fc2ppvdb-enhanced",
     GREASYFORK_URL: "https://greasyfork.org/scripts/552583"
   };
@@ -8617,11 +8623,17 @@ static notify(text, title = "FC2PPVDB Enhanced", image, onClick) {
     optionEnableMagnets: "Aggregate Magnet Search (Sukebei/0cili)",
     optionEnableExternalLinks: "Show External Links",
     portalCheckLabel: "Availability highlighting",
-    portalCheckVisible: "Check visible cards (low frequency)",
+    portalCheckVisible: "Check visible cards",
     portalCheckHover: "Check on hover / keyboard focus",
     portalCheckOff: "Off (no checks)",
     portalResultFound: "Matching page found",
-    portalCheckHint: "Cached results appear immediately. New checks are gradual: per site 1 request / 10 seconds, 30 / hour, 120 / day. Rate limits or challenges pause checks. Highlighting does not verify playback.",
+    portalStatus_queued: "Waiting to check",
+    portalStatus_checking: "Checking",
+    portalStatus_missing: "No matching result",
+    portalStatus_unknown: "Could not confirm (request failed or page changed)",
+    portalStatus_blocked: "Site verification / rate limit; open the site to verify",
+    portalStatus_off: "Checks off",
+    portalCheckHint: "Cached results appear immediately. One request per site at a time; no hourly/daily quota or fixed delay. Verification or rate limits are shown in the tooltip. Opening a matching site page reports the result back.",
     optionEnableActressName: "Fetch Actress Name from FD2PPV (Player Page)",
     optionReplaceFc2Covers: "Auto-replace HD Covers (Fourhoi)",
     optionSupjavSortByViews: "Sort Supjav List by Views",
@@ -8862,11 +8874,17 @@ static notify(text, title = "FC2PPVDB Enhanced", image, onClick) {
     optionEnableMagnets: "Sukebei/0cili マグネット検索を統合",
     optionEnableExternalLinks: "外部サイトへのジャンプを有効化",
     portalCheckLabel: "検索結果の強調表示",
-    portalCheckVisible: "表示中のカードを低頻度で確認",
+    portalCheckVisible: "表示中のカードを確認",
     portalCheckHover: "ホバー / キーボードフォーカス時のみ",
     portalCheckOff: "オフ（確認しない）",
     portalResultFound: "一致するページあり",
-    portalCheckHint: "キャッシュは即時表示。各サイト10秒に1回、毎時30回、毎日120回まで。制限や認証画面で一時停止します。再生可否は確認しません。",
+    portalStatus_queued: "確認待ち",
+    portalStatus_checking: "確認中",
+    portalStatus_missing: "一致する結果なし",
+    portalStatus_unknown: "確認できません（通信またはページ形式）",
+    portalStatus_blocked: "サイト認証 / 制限：サイトを開いて確認",
+    portalStatus_off: "確認オフ",
+    portalCheckHint: "各サイト同時1件。時間・日ごとの回数制限と固定待機なし。認証や制限はツールチップに表示。サイトを開いて確認した結果を共有します。",
     optionEnableActressName: "FD2PPV から出演者名を取得 (Player)",
     optionReplaceFc2Covers: "Fourhoi 高画質カバーを自動適用",
     optionSupjavSortByViews: "Supjav リストを再生数順にソート",
@@ -9107,11 +9125,17 @@ static notify(text, title = "FC2PPVDB Enhanced", image, onClick) {
     optionEnableMagnets: "聚合 Sukebei/0cili 的磁力搜索",
     optionEnableExternalLinks: "开启外部站点跳转",
     portalCheckLabel: "外站结果高亮",
-    portalCheckVisible: "可见卡片低频检查",
+    portalCheckVisible: "检查可见卡片",
     portalCheckHover: "仅悬停 / 键盘聚焦时检查",
     portalCheckOff: "关闭（不检查）",
     portalResultFound: "找到匹配页面",
-    portalCheckHint: "缓存立即显示，新结果逐步检查：每站每10秒最多1次，每小时30次、每天120次；限流或验证码时暂停。高亮表示找到匹配页面，不代表视频一定可播放。",
+    portalStatus_queued: "等待检查",
+    portalStatus_checking: "正在检查",
+    portalStatus_missing: "未找到匹配结果",
+    portalStatus_unknown: "未能确认（请求失败或页面结构变化）",
+    portalStatus_blocked: "站点验证 / 限流，请打开网站确认",
+    portalStatus_off: "已关闭检查",
+    portalCheckHint: "每站最多1个并发请求，无小时 / 每日配额或固定请求间隔。验证或限流会显示在悬停提示中；正常打开外站确认结果后会回传高亮。",
     optionEnableActressName: "播放器页抓取 FD2PPV 的演员名",
     optionReplaceFc2Covers: "自动补全 Fourhoi 的高清封面",
     optionSupjavSortByViews: "Supjav 列表按播放量排序",
@@ -14033,10 +14057,9 @@ variantClass,
     return portal ? buildPortalUrl(portal, data.id, data.type) : "";
   };
   const PORTAL_CHECK_POLICY = Object.freeze({
-    interval: 10000, timeout: 8000, dwell: 800,
-    hourly: 30, daily: 120,
-    foundTtl: 7 * 86400000, missingTtl: 6 * 3600000, unknownTtl: 3600000,
-    blockedCooldown: 6 * 3600000, errorCooldown: 15 * 60000
+    timeout: 12000, dwell: 250,
+    foundTtl: 7 * 86400000, missingTtl: 6 * 3600000, unknownTtl: 60000,
+    blockedCooldown: 60000, errorCooldown: 15000
   });
   const portalCheckMatchesId = (text, id) => {
     const escaped = String(id).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -14044,10 +14067,10 @@ variantClass,
   };
   const classifyPortalResponse = (portal, id, response, requestedUrl) => {
     const status = Number(response.status);
-    const html = String(response.responseText || '');
+    const html = String(response.responseText || response.response || '');
     const doc = new DOMParser().parseFromString(html, 'text/html');
     const challenge = /just a moment|attention required|verify (you are|that you are) human|access denied/i.test(doc.title) ||
-      !!doc.querySelector('#challenge-running, #challenge-form, .cf-turnstile, iframe[src*="challenges.cloudflare.com"], #captcha');
+      !!doc.querySelector('#challenge-running, #challenge-form') || /cf-mitigated:\s*challenge/i.test(response.responseHeaders || '');
     if ([403, 429, 503].includes(status) || challenge) return 'blocked';
     let finalUrl;
     try { finalUrl = new URL(response.finalUrl || requestedUrl); } catch { return 'unknown'; }
@@ -14056,24 +14079,23 @@ variantClass,
     if (portal === 'missav' && [404, 410].includes(status)) return 'missing';
     if (status !== 200 || !html) return 'unknown';
     if (portal === 'supjav') {
-      const links = [...doc.querySelectorAll('.posts .post h3 a, .posts .entry-title a, article .entry-title a')];
+      const links = [...doc.querySelectorAll('.posts .post h3 a, .posts .entry-title a, article .entry-title a, .post h2 a, .post h3 a, .post a.img, .post a[rel="bookmark"], .posts .entry-title')];
       const found = links.some(link => {
         let url;
         try { url = new URL(link.getAttribute('href'), finalUrl); } catch { return false; }
         return allowed.includes(url.hostname) && url.pathname !== '/' &&
-          portalCheckMatchesId(link.textContent + ' ' + (link.getAttribute('title') || ''), id);
+          portalCheckMatchesId(link.textContent + ' ' + (link.getAttribute('title') || '') + ' ' + (link.querySelector('img')?.getAttribute('alt') || ''), id);
       });
       if (found) return 'found';
-      if (doc.querySelector('.posts, .no-results, .search-no-results')) return 'missing';
+      if (doc.querySelector('.no-results, .search-no-results') || links.length > 0) return 'missing';
       return 'unknown';
     }
-    // A successful HTTP response or a matching recommendation is insufficient.
-    // Require the requested detail URL, its primary heading, and a player.
-    const requestedPath = new URL(requestedUrl).pathname.replace(/\/$/, '');
-    if (finalUrl.pathname.replace(/\/$/, '') !== requestedPath) return 'unknown';
+    // Locale / campaign path prefixes may redirect without changing the work.
+    // Require a matching detail slug and primary heading, not client-side player markup.
+    const slug = decodeURIComponent(finalUrl.pathname).split('/').filter(Boolean).pop() || '';
+    if (!portalCheckMatchesId(slug, id)) return 'unknown';
     const heading = doc.querySelector('h1');
-    const player = doc.querySelector('video, #player, .player-container, [x-data*="player"], .plyr');
-    return heading && player && portalCheckMatchesId(heading.textContent, id) ? 'found' : 'unknown';
+    return heading && portalCheckMatchesId(heading.textContent, id) ? 'found' : 'unknown';
   };
   const portalRetryAfter = (headers, now) => {
     const value = String(headers || '').match(/^retry-after:\s*(.+)$/im)?.[1]?.trim();
@@ -14083,18 +14105,18 @@ variantClass,
   class PortalAvailabilityService {
     buttons = new Map();
     busy = new Set();
+    inFlight = new Set();
     activeRequests = new Set();
     cleanupFns = [];
     observer = null;
     timer = null;
     generation = 0;
-    key(portal) { return `portal_availability_v1_${portal}`; }
+    key(portal) { return `portal_availability_v2_${portal}`; }
     read(portal) {
       const value = Storage.get(this.key(portal), {});
       return value && typeof value === 'object' ? {
-        entries: value.entries || {}, requests: Array.isArray(value.requests) ? value.requests : [],
-        nextAt: Number(value.nextAt) || 0, pausedUntil: Number(value.pausedUntil) || 0
-      } : { entries: {}, requests: [], nextAt: 0, pausedUntil: 0 };
+        entries: value.entries || {}, pausedUntil: Number(value.pausedUntil) || 0
+      } : { entries: {}, pausedUntil: 0 };
     }
     cached(state, key, now = Date.now()) {
       const entry = state.entries[key];
@@ -14108,15 +14130,16 @@ variantClass,
       this.onCleanup();
       this.observer = new IntersectionObserver(entries => {
         for (const entry of entries) {
-          const state = this.buttons.get(entry.target);
-          if (state) state.visibleSince = entry.isIntersecting ? Date.now() : 0;
+          for (const [button, state] of this.buttons) {
+            if (state.target === entry.target) state.visibleSince = entry.isIntersecting ? Date.now() : 0;
+          }
         }
         this.wake();
       }, { threshold: 0.01 });
       this.cleanupFns.push(CoreEvents.on(AppEvents.CARD_READY, ({ el }) => this.register(el)));
       for (const key of ['portalCheckMode', 'enableExternalLinks', 'enabledPortals']) {
         this.cleanupFns.push(State.on(key, () => {
-          // Cancelling is safe: requests already reserved their rate-limit slot.
+          // Stop outstanding checks when their display settings change.
           for (const request of this.activeRequests) request.abort();
           this.buttons.forEach((_state, button) => this.paint(button));
           this.wake();
@@ -14134,14 +14157,24 @@ variantClass,
       const resume = () => { if (!document.hidden) this.wake(); };
       document.addEventListener('visibilitychange', resume);
       this.cleanupFns.push(() => document.removeEventListener('visibilitychange', resume));
+      for (const portal of ['supjav', 'missav']) {
+        if (typeof GM_addValueChangeListener === 'function') {
+          const listener = GM_addValueChangeListener(this.key(portal), () => {
+            this.buttons.forEach((_state, button) => { if (button.dataset.portalSite === portal) this.paint(button); });
+            this.wake();
+          });
+          this.cleanupFns.push(() => GM_removeValueChangeListener(listener));
+        }
+      }
       this.register(document);
     }
     register(root) {
       root.querySelectorAll('.btn-site-jump[data-portal-site]').forEach(button => {
         if (!['supjav', 'missav'].includes(button.dataset.portalSite) || this.buttons.has(button)) return;
-        this.buttons.set(button, { visibleSince: 0, interestedUntil: 0 });
+        const target = button.closest('.processed-card') || button;
+        this.buttons.set(button, { target, visibleSince: 0, interestedUntil: 0 });
         this.paint(button);
-        this.observer?.observe(button);
+        this.observer?.observe(target);
       });
     }
     paint(button, entry) {
@@ -14150,16 +14183,18 @@ variantClass,
       const found = this.enabled(button) && entry?.status === 'found';
       button.classList.toggle('fc2-portal-found', found);
       const label = button.dataset.portalLabel;
-      const title = found ? `${label} · ${t('portalResultFound')}` : label;
+      const status = entry?.status || (this.enabled(button) ? 'queued' : 'off');
+      button.dataset.portalStatus = status;
+      const title = `${label} · ${t(found ? 'portalResultFound' : `portalStatus_${status}`)}`;
       button.title = title;
       button.dataset.title = title;
       const tooltip = button.querySelector('.fc2-enh-tooltip');
       if (tooltip) tooltip.textContent = title;
       button.setAttribute('aria-label', title);
     }
-    wake() {
+    wake(delay = 0) {
       if (this.timer) return;
-      this.timer = setTimeout(() => { this.timer = null; this.tick(); }, 1000);
+      this.timer = setTimeout(() => { this.timer = null; this.tick(); }, delay);
     }
     tick() {
       if (document.hidden) return;
@@ -14168,7 +14203,7 @@ variantClass,
       const states = new Map();
       for (const [button, state] of this.buttons) {
         if (!button.isConnected) {
-          this.observer?.unobserve(button); this.buttons.delete(button); continue;
+          this.observer?.unobserve(state.target || button); this.buttons.delete(button); continue;
         }
         if (!this.enabled(button)) continue;
         const visible = state.visibleSince && now - state.visibleSince >= PORTAL_CHECK_POLICY.dwell;
@@ -14185,9 +14220,7 @@ variantClass,
         this.paint(button, entry);
         if (entry) continue;
         waiting = true;
-        if (this.busy.has(portal) || saved.nextAt > now || saved.pausedUntil > now ||
-          saved.requests.filter(time => time > now - 3600000).length >= PORTAL_CHECK_POLICY.hourly ||
-          saved.requests.filter(time => time > now - 86400000).length >= PORTAL_CHECK_POLICY.daily) continue;
+        if (this.busy.has(portal) || saved.pausedUntil > now) continue;
         this.busy.add(portal);
         const generation = this.generation;
         void this.check(button).catch(error => Logger.warn('PortalCheck', 'Check failed', error)).finally(() => {
@@ -14195,14 +14228,14 @@ variantClass,
           if (generation === this.generation) this.wake();
         });
       }
-      if (waiting) this.wake();
+      if (waiting) this.wake(300);
     }
     async check(button) {
-      // Web Locks serialize tabs of this matched origin. Without support,
-      // stay cache-only instead of using a racy storage-based lock.
-      if (!navigator.locks?.request) return;
-      return navigator.locks.request(`fc2-portal-check-${button.dataset.portalSite}`, { ifAvailable: true }, async lock => {
-        if (!lock || !button.isConnected || !this.enabled(button) || document.hidden) return;
+      const site = button.dataset.portalSite;
+      if (this.inFlight.has(site)) return;
+      this.inFlight.add(site);
+      const run = async () => {
+        if (!button.isConnected || !this.enabled(button) || document.hidden) return;
         const portal = button.dataset.portalSite;
         if (!['supjav', 'missav'].includes(portal)) return;
         const requested = new URL(button.dataset.portalUrl);
@@ -14213,14 +14246,8 @@ variantClass,
         const saved = this.read(portal);
         const existing = this.cached(saved, key, now);
         if (existing) { this.paint(button, existing); return; }
-        saved.requests = saved.requests.filter(time => time > now - 86400000);
-        if (saved.pausedUntil > now || saved.nextAt > now ||
-          saved.requests.length >= PORTAL_CHECK_POLICY.daily ||
-          saved.requests.filter(time => time > now - 3600000).length >= PORTAL_CHECK_POLICY.hourly) return;
-        saved.requests.push(now);
-        saved.nextAt = now + PORTAL_CHECK_POLICY.interval;
-        // Persist before issuing a request; closing a tab must not reset budgets.
-        Storage.set(this.key(portal), saved);
+        if (saved.pausedUntil > now) return;
+        this.paint(button, { status: 'checking' });
         const response = await this.request(button.dataset.portalUrl);
         if (response.aborted) return;
         const result = classifyPortalResponse(portal, button.dataset.portalId, response, button.dataset.portalUrl);
@@ -14228,14 +14255,29 @@ variantClass,
         if (result === 'blocked') saved.pausedUntil = completed + Math.max(PORTAL_CHECK_POLICY.blockedCooldown, portalRetryAfter(response.responseHeaders, completed));
         else if (!response.status || response.status >= 500) saved.pausedUntil = completed + PORTAL_CHECK_POLICY.errorCooldown;
         const ttl = result === 'found' ? PORTAL_CHECK_POLICY.foundTtl : result === 'missing' ? PORTAL_CHECK_POLICY.missingTtl : PORTAL_CHECK_POLICY.unknownTtl;
-        saved.entries[key] = { status: result, expiresAt: completed + ttl };
+        // A real browser tab may have reported a positive result while this
+        // request was running. Merge instead of overwriting that evidence.
+        const latest = this.read(portal);
+        saved.entries = latest.entries;
+        const current = this.cached(latest, key, completed);
+        if (result === 'found' || current?.status !== 'found') {
+          saved.entries[key] = { status: result, expiresAt: completed + ttl };
+        }
         saved.entries = Object.fromEntries(Object.entries(saved.entries)
           .filter(([, entry]) => entry.expiresAt > completed).slice(-300));
         Storage.set(this.key(portal), saved);
         this.buttons.forEach((_state, target) => {
           if (target.dataset.portalSite === portal && target.dataset.portalKey === key) this.paint(target, saved.entries[key]);
         });
-      });
+      };
+      try {
+        if (navigator.locks?.request) {
+          return await navigator.locks.request(`fc2-portal-check-${site}`, { ifAvailable: true }, lock => lock ? run() : undefined);
+        }
+        // Some userscript environments do not expose Web Locks. Keep the
+        // per-tab concurrency limit instead of silently disabling all checks.
+        return await run();
+      } finally { this.inFlight.delete(site); }
     }
     request(url) {
       return new Promise(resolve => {
@@ -14250,7 +14292,7 @@ variantClass,
         const watchdog = setTimeout(() => { finish({ status: 0 }); handle?.abort(); }, PORTAL_CHECK_POLICY.timeout + 1000);
         this.activeRequests.add(request);
         try {
-          handle = GM_xmlhttpRequest({ method: 'GET', url, anonymous: true,
+          handle = GM_xmlhttpRequest({ method: 'GET', url,
             timeout: PORTAL_CHECK_POLICY.timeout, responseType: 'text',
             onload: finish, onerror: () => finish({ status: 0 }),
             ontimeout: () => finish({ status: 0 }), onabort: () => finish({ status: 0, aborted: true }) });
@@ -14266,6 +14308,27 @@ variantClass,
       this.buttons.clear(); this.busy.clear();
     }
   }
+  const observeNativePortalResult = () => {
+    const portal = /(^|\.)supjav\.com$/.test(location.hostname) ? 'supjav' : 'missav';
+    const id = portal === 'supjav' ? new URL(location.href).searchParams.get('s') : location.pathname.match(/fc2-ppv-(\d+)/i)?.[1];
+    if (!/^\d{5,8}$/.test(id || '')) return;
+    let timer;
+    const check = () => {
+      const result = classifyPortalResponse(portal, id, { status: 200, responseText: document.documentElement.outerHTML, finalUrl: location.href }, location.href);
+      if (result !== 'found') return;
+      const service = new PortalAvailabilityService();
+      const saved = service.read(portal);
+      saved.entries[`fc2:${id}`] = { status: 'found', expiresAt: Date.now() + PORTAL_CHECK_POLICY.foundTtl };
+      saved.pausedUntil = 0;
+      saved.entries = Object.fromEntries(Object.entries(saved.entries).filter(([, entry]) => entry.expiresAt > Date.now()).slice(-300));
+      Storage.set(service.key(portal), saved);
+      observer.disconnect(); clearTimeout(timer); clearTimeout(stop);
+    };
+    const observer = new MutationObserver(() => { clearTimeout(timer); timer = setTimeout(check, 300); });
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+    const stop = setTimeout(() => { observer.disconnect(); clearTimeout(timer); }, 60000);
+    check();
+  };
   AppContainer.register('portal-availability', new PortalAvailabilityService());
 
   const createSiteJumpButton = (portalId, data) => {
@@ -18748,6 +18811,10 @@ maintenanceTimer = null;
     return document.title.includes("Just a moment...") || !!document.querySelector("#challenge-running") || !!document.querySelector('iframe[src*="challenges.cloudflare.com"]');
   };
   const main = async () => {
+    if (/^(www\.)?(supjav\.com|missav\.(ws|ai))$/.test(location.hostname)) {
+      observeNativePortalResult();
+      return;
+    }
     Logger.init();
     if (isCloudflareChallenge()) {
       log.warn("Cloudflare challenge detected, skipping initialization");
@@ -18768,7 +18835,7 @@ maintenanceTimer = null;
   } else {
     main();
   }
-  BatchBar.init();
+  if (location.hostname === "fc2cmadb.com") BatchBar.init();
 
   class TabLifecycle {
     controller = null;
