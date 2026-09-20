@@ -2,7 +2,7 @@
 // @name            FC2PPVDB Enhanced Edition
 // @name:en         FC2PPVDB Enhanced Edition
 // @namespace       https://greasyfork.org/zh-CN/scripts/581352-fc2ppvdb-enhanced-edition
-// @version         2.1.4
+// @version         2.1.5
 // @author          Icarusle
 // @description     FC2CMADB 增强脚本：磁力链接自动聚合、高清封面补全、图集预览、历史记录同步与过滤。
 // @description:en  Enhancement script for FC2CMADB: magnet aggregation, HD cover restoration, gallery preview, history sync and filtering.
@@ -52,7 +52,7 @@
 
   const SCRIPT_INFO = {
     NAME: "FC2PPVDB Enhanced",
-    VERSION: typeof GM_info !== "undefined" ? GM_info.script.version : "2.1.2",
+    VERSION: typeof GM_info !== "undefined" ? GM_info.script.version : "2.1.5",
     NAMESPACE: "https://greasyfork.org/zh-CN/scripts/552583-fc2ppvdb-enhanced",
     GREASYFORK_URL: "https://greasyfork.org/scripts/552583"
   };
@@ -137,7 +137,7 @@
     resourceBtn: "resource-btn",
     btnLoading: "is-loading",
     btnMagnet: "magnet",
-    tooltip: "tooltip",
+    tooltip: "fc2-enh-tooltip",
     buttonText: "button-text",
     extraPreviewContainer: "preview-container",
     extraPreviewTitle: "preview-title",
@@ -6775,7 +6775,7 @@ static notify(text, title = "FC2PPVDB Enhanced", image, onClick) {
     }
     .enh-dropdown.active .enh-dropdown-content { display:flex; }
 
-    .tooltip {
+    .fc2-enh-tooltip {
         display:none;
         position:absolute;
         bottom:100%;
@@ -6793,7 +6793,7 @@ static notify(text, title = "FC2PPVDB Enhanced", image, onClick) {
         transition:opacity var(--fc2-motion-fast);
         z-index:var(--fc2-z-tooltip);
     }
-    .resource-btn:hover .tooltip { display:block; opacity:1; }
+    .resource-btn:hover .fc2-enh-tooltip { display:block; opacity:1; }
 
     /* ============================================================
        SKELETON & LOADING
@@ -10075,12 +10075,7 @@ searchId: id.toUpperCase()
   };
   const getFc2cmadbIndexedImage = (id) => {
     const key = String(id || "");
-    let imageUrl = getFc2cmadbPageImageIndex().get(key) || "";
-    if (!imageUrl) {
-      fc2cmadbImageIndex = null;
-      imageUrl = getFc2cmadbPageImageIndex().get(key) || "";
-    }
-    return imageUrl;
+    return getFc2cmadbPageImageIndex().get(key) || "";
   };
   const waitForFc2cmadbCardImage = (card, id, timeoutMs = 2500) => {
     const getRealImage = () => getFc2cmadbOriginalImage(card) || getFc2cmadbIndexedImage(id);
@@ -10135,17 +10130,15 @@ searchId: id.toUpperCase()
     name: "FC2CMADB",
     hostnames: ["fc2cmadb.com"],
     listOnDetail: false,
+    onBeforeInit: () => { fc2cmadbImageIndex = null; },
     detectContext: () => {
       return /^\/articles\/\d+(\/|$)/.test(location.pathname) ? PageContext.Detail : PageContext.List;
     },
     list: {
       containerSelector: 'main .flex.flex-wrap, main .grid, main [class*="flex-wrap"]',
       cardSelector: '.card.card-sm:not(.card-rebuilt):has(a[href*="/articles/"])',
-      identityKey: (card) => {
-        const link = card.querySelector('a[href*="/articles/"]');
-        const normalized = normalizeListArticleUrl(link?.href);
-        return normalized ? normalized.toLowerCase() : null;
-      },
+      // Deduplicate DOM hosts, not article URLs: repeated cards and pagination
+      // may legitimately show the same article in a new host.
       extractor: async (card) => {
         const titleLink = card.querySelector('h2.card-title a[href*="/articles/"]');
         const imageLink = card.querySelector('figure a[href*="/articles/"]');
@@ -10153,10 +10146,13 @@ searchId: id.toUpperCase()
         const id = MediaUtils.extractFC2Id(link?.href || "") || MediaUtils.extractFC2Id(card.querySelector("figure span.absolute.top-0.left-0")?.textContent || "");
         if (!id) return null;
         const articleUrl = normalizeListArticleUrl(link?.href) || `/articles/${id}`;
-        const imageUrl = await waitForFc2cmadbCardImage(card, id, 2500);
+        const imagePromise = waitForFc2cmadbCardImage(card, id, 2500);
         const writer = normalizeListOptionalText(card.querySelector('a[href*="/writers/"]')?.textContent);
         const listActress = extractFc2cmadbListActress(card);
-        const cachedActressRaw = await Repository.cache.get(`actress_${id}`).catch(() => null);
+        const [imageUrl, cachedActressRaw] = await Promise.all([
+          imagePromise,
+          listActress ? Promise.resolve(null) : Repository.cache.get(`actress_${id}`).catch(() => null)
+        ]);
         const cachedActress = normalizeListOptionalText(typeof cachedActressRaw === "string" ? cachedActressRaw : "");
         const title = normalizeListOptionalText(titleLink?.getAttribute("title") || titleLink?.textContent) || `FC2-PPV-${id}`;
         const localImageUrl = imageUrl || getFc2cmadbIndexedImage(id);
@@ -11492,7 +11488,6 @@ subscribe(handler) {
       this.process = process;
     }
     init(mutationObserverTarget, observeMutations = true) {
-      const obs = this.setupListMutationObserver();
       if (mutationObserverTarget === "container" && !!this.containerSelector) {
         this.setupContainerObserver();
       } else if (observeMutations !== false) {
@@ -11502,7 +11497,6 @@ subscribe(handler) {
           })
         );
       }
-      this.observers.push(obs);
       return this.observers;
     }
     setupListMutationObserver() {
@@ -11521,6 +11515,7 @@ subscribe(handler) {
     handleAddedNodes(nodes) {
       const added = new Set();
       for (const el of nodes) {
+        if (!el.isConnected || el.closest(`.${Config.CLASSES.processedCard}`)) continue;
         if (!this.isInListScope(el)) continue;
         if (el.matches(this.cardSelector)) {
           added.add(el);
@@ -11585,11 +11580,58 @@ subscribe(handler) {
     }
   }
 
+  class CardProcessingQueue {
+    pending = new Map();
+    running = new Map();
+    cancelled = false;
+    constructor(process, concurrency = 8) {
+      this.process = process;
+      this.concurrency = concurrency;
+    }
+    enqueue(nodes) {
+      if (this.cancelled) return Promise.resolve();
+      const tasks = nodes.map((node) => {
+        const existing = this.pending.get(node) || this.running.get(node);
+        if (existing) return existing.promise;
+        let resolve;
+        const promise = new Promise((done) => { resolve = done; });
+        this.pending.set(node, { promise, resolve });
+        return promise;
+      });
+      this.drain();
+      return Promise.all(tasks);
+    }
+    drain() {
+      while (!this.cancelled && this.running.size < this.concurrency && this.pending.size) {
+        const [node, task] = this.pending.entries().next().value;
+        this.pending.delete(node);
+        this.running.set(node, task);
+        Promise.resolve().then(() => {
+          if (!this.cancelled && node.isConnected) return this.process(node);
+        }).catch((error) => {
+          Logger.warn("CardQueue", "Card processing failed", error);
+        }).finally(() => {
+          this.running.delete(node);
+          task.resolve();
+          this.drain();
+        });
+      }
+    }
+    cancel() {
+      this.cancelled = true;
+      this.pending.forEach((task) => task.resolve());
+      this.pending.clear();
+    }
+  }
+
   const log$o = Logger.scope("Site");
   class BaseSite {
     config;
     observers = [];
     listObserver = null;
+    cardQueue = null;
+    listGeneration = 0;
+    initGeneration = 0;
     activeContext = PageContext.Unknown;
     _unsubs = [];
     hostProcessedAttr = "data-enh-card-host";
@@ -11604,20 +11646,25 @@ subscribe(handler) {
       this._unsubs = [];
     }
     async init() {
+      const generation = ++this.initGeneration;
       try {
         log$o.debug(`Initializing ${this.config.name}`);
         this.clearSubscriptions();
         if (this.config.onBeforeInit) await this.config.onBeforeInit();
+        if (generation !== this.initGeneration) return;
         this.activeContext = this.detectContext();
         if (this.config.list && ([PageContext.List, PageContext.Search].includes(this.activeContext) || this.activeContext === PageContext.Detail && this.config.listOnDetail)) {
           await this.initListMode();
         }
+        if (generation !== this.initGeneration) return;
         if (this.config.detail && this.activeContext === PageContext.Detail) {
           this.initDetailMode();
         }
         if (this.config.customInit) this.config.customInit();
         if (this.config.onInit) await this.config.onInit();
+        if (generation !== this.initGeneration) return;
         if (this.config.onAfterInit) await this.config.onAfterInit();
+        if (generation !== this.initGeneration) return;
         this._unsubs.push(
           State.on(({ prop }) => {
             if (["hideNoMagnet", "enableMagnets", "hideCensored", "hideViewed"].includes(prop)) {
@@ -11659,49 +11706,50 @@ subscribe(handler) {
         }
       });
     }
+    cancelCardQueue() {
+      if (!this.cardQueue) return;
+      for (const host of this.cardQueue.running.keys()) {
+        host.removeAttribute("data-enh-rebuilding");
+        const key = host.getAttribute(this.sourceKeyAttr);
+        if (key) this.sourceKeyManager.release(key, false);
+        host.removeAttribute(this.sourceKeyAttr);
+      }
+      this.cardQueue.cancel();
+      this.cardQueue = null;
+    }
     async initListMode() {
       if (!this.config.list) return;
       const list = this.config.list;
-      const process = async (nodes) => {
-        for (const c of nodes) {
-          try {
-            const host = c;
-            if (list.containerSelector && !c.closest(list.containerSelector)) continue;
-            if (this.hostGuard.isNestedInsideProcessed(host)) continue;
-            if (this.hostGuard.isAlreadyProcessed(host) || host.hasAttribute("data-enh-rebuilding")) continue;
-            if (list.shouldProcessCard && !list.shouldProcessCard(host)) continue;
-            const sourceKey = list.identityKey ? list.identityKey(host)?.trim() || null : null;
-            if (sourceKey) {
-              if (this.sourceKeyManager.isProcessing(sourceKey) || this.sourceKeyManager.isRecentlyProcessed(sourceKey)) {
-                continue;
-              }
-              this.sourceKeyManager.markInFlight(sourceKey);
-              host.setAttribute(this.sourceKeyAttr, sourceKey);
-            }
-            host.setAttribute("data-enh-rebuilding", "true");
-            try {
-              await this.processCard(host);
-            } catch (err) {
-              log$o.error("processCard failed", err);
-              host.removeAttribute("data-enh-rebuilding");
-              const k = host.getAttribute(this.sourceKeyAttr);
-              if (k) this.sourceKeyManager.release(k, false);
-              host.removeAttribute(this.sourceKeyAttr);
-            }
-          } catch (e) {
-            log$o.error("Card iteration error", e);
+      this.cancelCardQueue();
+      const generation = ++this.listGeneration;
+      const process = async (host) => {
+        try {
+          if (generation !== this.listGeneration || !host.isConnected) return;
+          if (list.containerSelector && !host.closest(list.containerSelector)) return;
+          if (this.hostGuard.isNestedInsideProcessed(host)) return;
+          if (this.hostGuard.isAlreadyProcessed(host) || host.hasAttribute("data-enh-rebuilding")) return;
+          if (list.shouldProcessCard && !list.shouldProcessCard(host)) return;
+          const sourceKey = list.identityKey ? list.identityKey(host)?.trim() || null : null;
+          if (sourceKey) {
+            if (this.sourceKeyManager.isProcessing(sourceKey) || this.sourceKeyManager.isRecentlyProcessed(sourceKey)) return;
+            this.sourceKeyManager.markInFlight(sourceKey);
+            host.setAttribute(this.sourceKeyAttr, sourceKey);
           }
+          host.setAttribute("data-enh-rebuilding", "true");
+          await this.processCard(host, generation);
+        } catch (error) {
+          log$o.error("Card iteration error", error);
         }
       };
-      const initialNodes = Array.from(document.querySelectorAll(list.cardSelector));
-      if (initialNodes.length > 0) {
-        await process(initialNodes);
-      }
+      const queue = this.cardQueue = new CardProcessingQueue(process);
+      this.listObserver?.disconnect();
       this.listObserver = new SiteListObserver(list.cardSelector, list.containerSelector, (nodes) => {
-        void process(nodes);
+        void queue.enqueue(nodes);
       });
+      // Observe before awaiting extraction so lazy rendering cannot fall into a gap.
       const obs = this.listObserver.init(list.mutationObserverTarget, list.observeMutations !== false);
       this.observers.push(...obs);
+      await queue.enqueue(Array.from(document.querySelectorAll(list.cardSelector)));
     }
     initDetailMode() {
       if (!this.config.detail) return;
@@ -11731,22 +11779,21 @@ subscribe(handler) {
       obs.observe(document.body, { childList: true, subtree: true });
       this.observers.push(obs);
     }
-    async processCard(card) {
+    async processCard(card, generation = this.listGeneration) {
       if (!this.config.list) return;
       const list = this.config.list;
       try {
         let data = list.extractor(card);
         if (data instanceof Promise) data = await data;
-        if (!data) {
+        // A previous lifecycle must not clear flags owned by a newer run.
+        if (generation !== this.listGeneration) return;
+        if (!data || !card.isConnected) {
           card.removeAttribute("data-enh-rebuilding");
           const k2 = card.getAttribute(this.sourceKeyAttr);
           if (k2) this.sourceKeyManager.release(k2, false);
           card.removeAttribute(this.sourceKeyAttr);
           return;
         }
-        card.setAttribute("data-enh-processed", "true");
-        card.classList.add(Config.CLASSES.cardRebuilt);
-        this.hostGuard.markProcessed(card);
         const gridContainerSelector = list.gridContainerSelector ?? list.containerSelector;
         const gridContainer = gridContainerSelector ? card.closest(gridContainerSelector) : null;
         markGridContainer(gridContainer);
@@ -11761,11 +11808,18 @@ subscribe(handler) {
             list.postProcess(card, final, newCard, data, classes);
           } : void 0
         });
+        if (!card.querySelector(`.${Config.CLASSES.processedCard}`)) {
+          throw new Error("Enhanced card was not mounted");
+        }
+        card.setAttribute("data-enh-processed", "true");
+        card.classList.add(Config.CLASSES.cardRebuilt);
+        this.hostGuard.markProcessed(card);
         card.dataset.id = data.id;
         card.removeAttribute("data-enh-rebuilding");
         const k = card.getAttribute(this.sourceKeyAttr);
         if (k) this.sourceKeyManager.release(k, true);
       } catch (error) {
+        if (generation !== this.listGeneration) return;
         log$o.error("processCard failed", error);
         card.removeAttribute("data-enh-rebuilding");
         const k = card.getAttribute(this.sourceKeyAttr);
@@ -11774,6 +11828,9 @@ subscribe(handler) {
       }
     }
     cleanup() {
+      ++this.initGeneration;
+      ++this.listGeneration;
+      this.cancelCardQueue();
       this.observers.forEach((o) => o.disconnect());
       this.observers = [];
       if (this.listObserver) {
@@ -12161,7 +12218,7 @@ subscribe(handler) {
     shouldShowTooltip(element) {
       if ("ontouchstart" in window) return false;
       if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") return false;
-      if (element.querySelector(".tooltip")) return false;
+      if (element.querySelector(`.${Config.CLASSES.tooltip}`)) return false;
       return true;
     },
     show(element, text) {
