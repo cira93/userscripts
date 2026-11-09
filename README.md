@@ -14,6 +14,7 @@ versions automatically.
 | ThePornDB 拍摄当时年龄筛选 | [theporndb-age-filter](theporndb-age-filter/) | [install](https://raw.githubusercontent.com/cira93/userscripts/main/theporndb-age-filter/theporndb-age-filter.user.js) |
 | CoomerFans 视频标记 | [coomerfans-video-marker](coomerfans-video-marker/) | [install](https://raw.githubusercontent.com/cira93/userscripts/main/coomerfans-video-marker/coomerfans-video-marker.user.js) |
 | みんなのAV 年龄筛选 + 合并分页 | [minnano-av-age](minnano-av-age/) | [install](https://raw.githubusercontent.com/cira93/userscripts/main/minnano-av-age/minnano-av-age.user.js) |
+| 视频伪全屏（YouTube / B站，无动画、无提示） | [video-pseudo-fullscreen](video-pseudo-fullscreen/) | [install](https://raw.githubusercontent.com/cira93/userscripts/main/video-pseudo-fullscreen/video-pseudo-fullscreen.user.js) |
 
 ## Workflow
 
