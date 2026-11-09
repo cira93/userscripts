@@ -6,11 +6,11 @@ versions automatically.
 
 | Script | Folder | Install |
 |---|---|---|
-| Bilibili 扩展倍速（最高 10x） | [bilibili-extended-speed](bilibili-extended-speed/) | [install](https://raw.githubusercontent.com/__GH_USER__/__GH_REPO__/main/bilibili-extended-speed/bilibili-extended-speed.user.js) |
-| B站精准搜索 · 自动补页 | [bilibili-search-enhancer](bilibili-search-enhancer/) | [install](https://raw.githubusercontent.com/__GH_USER__/__GH_REPO__/main/bilibili-search-enhancer/bilibili-search-enhancer.user.js) |
-| B站字幕和评论提取 | [bilibili-subtitle](bilibili-subtitle/) | [install](https://raw.githubusercontent.com/__GH_USER__/__GH_REPO__/main/bilibili-subtitle/bilibili-subtitle.user.js) |
-| YouTube 方向键增强 | [youtube-arrow-enhancer](youtube-arrow-enhancer/) | [install](https://raw.githubusercontent.com/__GH_USER__/__GH_REPO__/main/youtube-arrow-enhancer/youtube-arrow-enhancer.user.js) |
-| FC2PPVDB Enhanced（本地修复版） | [fc2ppvdb-enhanced](fc2ppvdb-enhanced/) | [install](https://raw.githubusercontent.com/__GH_USER__/__GH_REPO__/main/fc2ppvdb-enhanced/fc2ppvdb-enhanced.user.js) |
+| Bilibili 扩展倍速（最高 10x） | [bilibili-extended-speed](bilibili-extended-speed/) | [install](https://raw.githubusercontent.com/cira93/userscripts/main/bilibili-extended-speed/bilibili-extended-speed.user.js) |
+| B站精准搜索 · 自动补页 | [bilibili-search-enhancer](bilibili-search-enhancer/) | [install](https://raw.githubusercontent.com/cira93/userscripts/main/bilibili-search-enhancer/bilibili-search-enhancer.user.js) |
+| B站字幕和评论提取 | [bilibili-subtitle](bilibili-subtitle/) | [install](https://raw.githubusercontent.com/cira93/userscripts/main/bilibili-subtitle/bilibili-subtitle.user.js) |
+| YouTube 方向键增强 | [youtube-arrow-enhancer](youtube-arrow-enhancer/) | [install](https://raw.githubusercontent.com/cira93/userscripts/main/youtube-arrow-enhancer/youtube-arrow-enhancer.user.js) |
+| FC2PPVDB Enhanced（本地修复版） | [fc2ppvdb-enhanced](fc2ppvdb-enhanced/) | [install](https://raw.githubusercontent.com/cira93/userscripts/main/fc2ppvdb-enhanced/fc2ppvdb-enhanced.user.js) |
 
 ## Workflow
 

@@ -3,6 +3,8 @@
 // @name:en         FC2PPVDB Enhanced Edition
 // @namespace       https://greasyfork.org/zh-CN/scripts/581352-fc2ppvdb-enhanced-edition
 // @version         2.1.10
+// @updateURL         https://raw.githubusercontent.com/cira93/userscripts/main/fc2ppvdb-enhanced/fc2ppvdb-enhanced.user.js
+// @downloadURL       https://raw.githubusercontent.com/cira93/userscripts/main/fc2ppvdb-enhanced/fc2ppvdb-enhanced.user.js
 // @author          Icarusle
 // @description     FC2CMADB 增强脚本：磁力链接自动聚合、高清封面补全、图集预览、历史记录同步与过滤。
 // @description:en  Enhancement script for FC2CMADB: magnet aggregation, HD cover restoration, gallery preview, history sync and filtering.
@@ -52,8 +54,6 @@
 // @grant           unsafeWindow
 // @run-at          document-end
 // @noframes
-// @downloadURL https://update.sleazyfork.org/scripts/581352/FC2PPVDB%20Enhanced%20Edition.user.js
-// @updateURL https://update.sleazyfork.org/scripts/581352/FC2PPVDB%20Enhanced%20Edition.meta.js
 // ==/UserScript==
 
 (function (Dexie) {

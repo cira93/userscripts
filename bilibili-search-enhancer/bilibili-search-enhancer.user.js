@@ -2,6 +2,8 @@
 // @name         B站精准搜索 · 自动补页
 // @namespace    local.bilibili.search.enhancer
 // @version      0.3.3
+// @updateURL      https://raw.githubusercontent.com/cira93/userscripts/main/bilibili-search-enhancer/bilibili-search-enhancer.user.js
+// @downloadURL    https://raw.githubusercontent.com/cira93/userscripts/main/bilibili-search-enhancer/bilibili-search-enhancer.user.js
 // @description  原生卡片、原站主题；严格匹配、自动补页，显示加载进度。Firefox 兼容。
 // @match        https://search.bilibili.com/*
 // @grant        GM_xmlhttpRequest

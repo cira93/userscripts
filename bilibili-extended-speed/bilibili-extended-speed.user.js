@@ -2,6 +2,8 @@
 // @name         Bilibili 扩展倍速（最高 10x）
 // @namespace    local.bilibili.extended-speed
 // @version      1.1.0
+// @updateURL      https://raw.githubusercontent.com/cira93/userscripts/main/bilibili-extended-speed/bilibili-extended-speed.user.js
+// @downloadURL    https://raw.githubusercontent.com/cira93/userscripts/main/bilibili-extended-speed/bilibili-extended-speed.user.js
 // @description  为 Bilibili 视频播放器增加 2.5x–10x 倍速选项，并默认开启可用字幕。
 // @author       You
 // @match        https://www.bilibili.com/video/*

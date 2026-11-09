@@ -2,6 +2,8 @@
 // @name         YouTube 方向键增强安全版 v1.2：控制栏倍速
 // @namespace    youtube-arrow-enhancer-safe-v12
 // @version      1.3.2
+// @updateURL      https://raw.githubusercontent.com/cira93/userscripts/main/youtube-arrow-enhancer/youtube-arrow-enhancer.user.js
+// @downloadURL    https://raw.githubusercontent.com/cira93/userscripts/main/youtube-arrow-enhancer/youtube-arrow-enhancer.user.js
 // @description  方向键控制音量/快进后退，按住右方向键临时3倍速，控制栏倍速与网页全屏。
 // @match        https://www.youtube.com/*
 // @match        https://m.youtube.com/*

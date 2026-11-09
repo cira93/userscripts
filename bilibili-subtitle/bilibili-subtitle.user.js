@@ -2,6 +2,8 @@
 // @name         B站字幕和评论提取
 // @namespace    local.bilibili.subtitle
 // @version      2.0.1
+// @updateURL      https://raw.githubusercontent.com/cira93/userscripts/main/bilibili-subtitle/bilibili-subtitle.user.js
+// @downloadURL    https://raw.githubusercontent.com/cira93/userscripts/main/bilibili-subtitle/bilibili-subtitle.user.js
 // @description  导出当前分P字幕，以及整个视频可访问的评论和楼中楼；支持暂停续传、去重和采集报告。
 // @match        https://www.bilibili.com/*
 // @run-at       document-idle
