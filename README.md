@@ -11,6 +11,9 @@ versions automatically.
 | B站字幕和评论提取 | [bilibili-subtitle](bilibili-subtitle/) | [install](https://raw.githubusercontent.com/cira93/userscripts/main/bilibili-subtitle/bilibili-subtitle.user.js) |
 | YouTube 方向键增强 | [youtube-arrow-enhancer](youtube-arrow-enhancer/) | [install](https://raw.githubusercontent.com/cira93/userscripts/main/youtube-arrow-enhancer/youtube-arrow-enhancer.user.js) |
 | FC2PPVDB Enhanced（本地修复版） | [fc2ppvdb-enhanced](fc2ppvdb-enhanced/) | [install](https://raw.githubusercontent.com/cira93/userscripts/main/fc2ppvdb-enhanced/fc2ppvdb-enhanced.user.js) |
+| ThePornDB 拍摄当时年龄筛选 | [theporndb-age-filter](theporndb-age-filter/) | [install](https://raw.githubusercontent.com/cira93/userscripts/main/theporndb-age-filter/theporndb-age-filter.user.js) |
+| CoomerFans 视频标记 | [coomerfans-video-marker](coomerfans-video-marker/) | [install](https://raw.githubusercontent.com/cira93/userscripts/main/coomerfans-video-marker/coomerfans-video-marker.user.js) |
+| みんなのAV 年龄筛选 + 合并分页 | [minnano-av-age](minnano-av-age/) | [install](https://raw.githubusercontent.com/cira93/userscripts/main/minnano-av-age/minnano-av-age.user.js) |
 
 ## Workflow
 
