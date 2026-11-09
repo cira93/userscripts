@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Auto-bump the patch part of @version for every staged *.user.js whose
+# content changed but whose @version was not edited by hand.
+# Enable once per clone:  git config core.hooksPath .githooks
+set -euo pipefail
+
+version_of() { sed -n 's#^//[[:space:]]*@version[[:space:]]*\([^[:space:]]*\).*#\1#p' | tr -d '\r' | head -1; }
+
+files=$(git diff --cached --name-only --diff-filter=M -- '*.user.js')
+[ -z "$files" ] && exit 0
+
+while IFS= read -r f; do
+  new=$(git show ":$f" | version_of)
+  old=$(git show "HEAD:$f" 2>/dev/null | version_of || true)
+  [ -z "$new" ] || [ -z "$old" ] && continue
+  [ "$new" != "$old" ] && continue            # bumped by hand already
+
+  bumped=$(printf '%s' "$new" | awk -F. 'BEGIN{OFS="."} { $NF = $NF + 1; print }')
+
+  if ! git diff --quiet -- "$f"; then
+    echo "pre-commit: $f 还有未暂存的改动。请先 git add，或手动把 @version 改成 $bumped。" >&2
+    exit 1
+  fi
+
+  NEW="$new" BUMPED="$bumped" perl -pi -e \
+    'if (!$done && s{^(//\s*\@version\s+)\Q$ENV{NEW}\E(\s*)$}{$1$ENV{BUMPED}$2}) { $done = 1 }' "$f"
+  git add "$f"
+  echo "pre-commit: $f  @version $new -> $bumped"
+done <<< "$files"
